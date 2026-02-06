@@ -1,0 +1,73 @@
+# =========================
+# Build output (CMake)
+# =========================
+/out/
+/build/
+/cmake-build-*/
+/CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# =========================
+# Visual Studio
+# =========================
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.VC.db
+*.VC.opendb
+
+# =========================
+# Ninja
+# =========================
+.ninja_deps
+.ninja_log
+
+# =========================
+# Windows binaries
+# =========================
+*.exe
+*.dll
+*.lib
+*.pdb
+*.ilk
+*.exp
+
+# =========================
+# Vulkan / Shaders
+# =========================
+*.spv
+
+# =========================
+# vcpkg
+# =========================
+/vcpkg_installed/
+vcpkg_installed/
+
+# If vcpkg is inside the repo (optional)
+vcpkg/
+vcpkg.exe
+vcpkg-bootstrap.log
+
+# =========================
+# Assets (generated copies)
+# =========================
+/out/**/textures/
+/out/**/models/
+/out/**/shaders/
+
+# =========================
+# OS junk
+# =========================
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# =========================
+# Logs
+# =========================
+*.log
