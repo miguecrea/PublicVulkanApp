@@ -1,6 +1,7 @@
 #include"../Headers/VulkanApp.h"
 #include"../Headers/Window.h"
-#include"../Headers/Instance.h"
+#include"../Headers/InstanceManager.h"
+#include"../Headers/DeviceManager.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -10,15 +11,19 @@
 VulkanApp::VulkanApp()
 {
 	m_Window = new Window();
-	m_Instance = new Instance();
+	m_InstanceManager = new InstanceManager();
+	m_DeviceManager = new DeviceManager();
 }
 VulkanApp::~VulkanApp()
 {
 	delete m_Window;
 	m_Window = nullptr;
 
-	delete m_Instance;
-	m_Instance = nullptr;
+	delete m_InstanceManager;
+	m_InstanceManager = nullptr;
+
+	delete m_DeviceManager;
+	m_DeviceManager = nullptr;
 
 }
 void VulkanApp::InitWindow()
@@ -35,8 +40,11 @@ void VulkanApp::InitWindow()
 
 void VulkanApp::InitVulkan()
 {
-	m_Instance->CreateInstance();
-	
+	m_InstanceManager->CreateInstance();
+	m_InstanceManager->setupDebugMessenger();
+	m_DeviceManager->pickPhysicalDevice(m_InstanceManager->GetVulkanInstance());
+	m_DeviceManager->createLogicalDevice(m_InstanceManager);
+
 }
 
 void VulkanApp::MainLoop()
@@ -56,12 +64,9 @@ void VulkanApp::Run()
 }
 void VulkanApp::CleanUp()
 {
-
-	/*if (enableValidationLayers) 
-	{
-		DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
-	}*/
-	vkDestroyInstance(m_Instance->GetInstance(), nullptr);
+	m_DeviceManager->DestroyLogicalDevice();
+	m_InstanceManager->DestroyValidationLayers();
+	vkDestroyInstance(m_InstanceManager->GetVulkanInstance(), nullptr);
 	glfwDestroyWindow(m_Window->GetWindow());
 	glfwTerminate();
 }

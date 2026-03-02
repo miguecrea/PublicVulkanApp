@@ -4,8 +4,8 @@
 #include "../Headers/VulkanApp.h"
 
 class Window;
-class Instance;
-
+class InstanceManager;
+class DeviceManager;
 class VulkanApp final
 {
 public:
@@ -20,13 +20,10 @@ private:
     void CleanUp();
 
     Window * m_Window;
-    Instance * m_Instance;
-
-
+    InstanceManager * m_InstanceManager;
+    DeviceManager * m_DeviceManager;
    void  setupDebugMessenger();
 
-    //Validation Layers 
- //   VkDebugUtilsMessengerEXT debugMessenger;
 
 };
 
