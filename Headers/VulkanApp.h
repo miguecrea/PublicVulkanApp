@@ -6,6 +6,8 @@
 class Window;
 class InstanceManager;
 class DeviceManager;
+
+
 class VulkanApp final
 {
 public:
@@ -13,7 +15,6 @@ public:
     ~VulkanApp();
     void Run();
 private:
-
     void InitWindow();
     void InitVulkan();
     void MainLoop();
@@ -22,9 +23,7 @@ private:
     Window * m_Window;
     InstanceManager * m_InstanceManager;
     DeviceManager * m_DeviceManager;
-   void  setupDebugMessenger();
-
-
+    void  setupDebugMessenger();
 };
 
 

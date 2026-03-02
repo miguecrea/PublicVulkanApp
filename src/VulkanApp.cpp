@@ -42,6 +42,11 @@ void VulkanApp::InitVulkan()
 {
 	m_InstanceManager->CreateInstance();
 	m_InstanceManager->setupDebugMessenger();
+	m_Window->createSurface(m_InstanceManager->GetVulkanInstance());
+
+	//SET SURFACE TO BE USED FINDING QUEUUE FAMILY
+	m_DeviceManager->SetSurface(m_Window->surface);
+
 	m_DeviceManager->pickPhysicalDevice(m_InstanceManager->GetVulkanInstance());
 	m_DeviceManager->createLogicalDevice(m_InstanceManager);
 
@@ -66,6 +71,7 @@ void VulkanApp::CleanUp()
 {
 	m_DeviceManager->DestroyLogicalDevice();
 	m_InstanceManager->DestroyValidationLayers();
+	m_Window->DestroySurface(m_InstanceManager->GetVulkanInstance());
 	vkDestroyInstance(m_InstanceManager->GetVulkanInstance(), nullptr);
 	glfwDestroyWindow(m_Window->GetWindow());
 	glfwTerminate();

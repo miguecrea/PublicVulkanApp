@@ -1,12 +1,11 @@
 #include "../Headers/Window.h"
+#include <vector>
+#include <stdexcept>
+#include <iostream>
+
 
 Window::Window()
 {
-}
-
-GLFWwindow * Window::GetWindow()
-{
-    return m_WindowPointer;
 }
 
 void Window::initWindow()
@@ -17,4 +16,22 @@ void Window::initWindow()
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     m_WindowPointer = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
 }
+
+GLFWwindow * Window::GetWindow()
+{
+    return m_WindowPointer;
+}
+
+void Window::createSurface(VkInstance Vulkaninstance)
+{
+    if (glfwCreateWindowSurface(Vulkaninstance,m_WindowPointer, nullptr, &surface) != VK_SUCCESS)
+    {
+        throw std::runtime_error("failed to create window surface!");
+    }
+}
+void Window::DestroySurface(VkInstance Vulkaninstance)
+{
+    vkDestroySurfaceKHR(Vulkaninstance, surface, nullptr);
+}
+
 

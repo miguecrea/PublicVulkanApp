@@ -4,13 +4,15 @@
 #include <optional>
 #include <stdexcept>
 #include <iostream>
+#include <set>
+
 DeviceManager::DeviceManager()
 {
 }
 
 void DeviceManager::pickPhysicalDevice(VkInstance Instance)
 {
-	
+ 
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(Instance, &deviceCount, nullptr);
 
@@ -47,22 +49,31 @@ void DeviceManager::createLogicalDevice(InstanceManager * IntanceManager)
 
     //QUEUE FAMILY
     QueueFamilyIndices indices = findQueueFamilies(m_physicalDevice);
-    VkDeviceQueueCreateInfo queueCreateInfo{};
-    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
-    queueCreateInfo.queueCount = 1;
+
+    //set in case they are In the same Index 
+    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+    std::set<uint32_t> uniqueQueueFamilies = { indices.graphicsFamily.value(), indices.presentFamily.value() };
+
     float queuePriority = 1.0f;
-    queueCreateInfo.pQueuePriorities = &queuePriority;
+    for (uint32_t queueFamily : uniqueQueueFamilies) 
+    {
+        VkDeviceQueueCreateInfo queueCreateInfo{};
+        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo.queueFamilyIndex = queueFamily;  //index 
+        queueCreateInfo.queueCount = 1;
+        queueCreateInfo.pQueuePriorities = &queuePriority;
+        queueCreateInfos.push_back(queueCreateInfo);
+    }
 
 
-    // LOGICAL DEVICE
+    // CREATE LOGICAL DEVICE USING THE DATA OF THE QUUE Create Info 
     VkPhysicalDeviceFeatures deviceFeatures{};
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-
-    createInfo.pQueueCreateInfos = &queueCreateInfo;
-    createInfo.queueCreateInfoCount = 1;
+    createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
+    createInfo.pQueueCreateInfos = queueCreateInfos.data();
     createInfo.pEnabledFeatures = &deviceFeatures;
+
 
     // Specify device specific  extensions and validation layers for logical device 
     //for now we dont need any device specifoc functionality 
@@ -84,6 +95,12 @@ void DeviceManager::createLogicalDevice(InstanceManager * IntanceManager)
 
     //we stored the graphics queue family in a Handle 
     vkGetDeviceQueue(m_LogicalDevice,indices.graphicsFamily.value(), 0, &graphicsQueue);
+    //store present family in a handle 
+    vkGetDeviceQueue(m_LogicalDevice, indices.presentFamily.value(), 0, &presentQueue);
+
+
+
+
 }
 
 void DeviceManager::DestroyLogicalDevice()
@@ -127,10 +144,26 @@ QueueFamilyIndices DeviceManager::findQueueFamilies(VkPhysicalDevice device)
     int i = 0;
     for (const auto & queueFamily : queueFamilies)
     {
+        //seee if the graphics and present are supported 
+        //check all of families could be they are on differen or the same 
         if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) 
         {
             indices.graphicsFamily = i;
         }
+        VkBool32 presentSupport = false;
+
+        if (m_Surface == nullptr)
+        {
+            std::cout << "Surface Is Null\n";
+        }
+
+        vkGetPhysicalDeviceSurfaceSupportKHR(device,i,m_Surface,&presentSupport);
+
+        if (presentSupport) {
+            indices.presentFamily = i;
+        }
+
+
 
         if (indices.isComplete()) {
             break;
