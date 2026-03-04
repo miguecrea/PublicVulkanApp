@@ -4,6 +4,7 @@
 #include"../Headers/DeviceManager.h"
 #include"../Headers/SwapChain.h"
 #include"../Headers/GraphicsPipeline.h"
+#include"../Headers/RenderPass.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -35,6 +36,9 @@ VulkanApp::~VulkanApp()
 	delete m_GraphicsPipeline;
 	m_GraphicsPipeline = nullptr;
 
+	delete m_RenderPass;
+	m_RenderPass = nullptr;
+
 }
 void VulkanApp::InitWindow()
 {
@@ -60,12 +64,18 @@ void VulkanApp::InitVulkan()
 	m_DeviceManager->pickPhysicalDevice(m_InstanceManager->GetVulkanInstance());
 	m_DeviceManager->createLogicalDevice(m_InstanceManager);
 	m_SwapChain->createSwapChain(m_DeviceManager->GetPhysicalDevice(),m_DeviceManager->GetLogicalDevice(), m_Window->surface, m_Window->GetWindow());
+	//An image view is sufficient to start using an image as a texture, but it's not quite ready to be used as a render target just yet. 
+	// That requires one more step of indirection, known as a framebuffer.
+	//But first we'll have to set up the graphics pipeline.
 	m_SwapChain->createImageViews(m_DeviceManager->GetLogicalDevice());
 
 
-	//An image view is sufficient to start using an image as a texture, but it's not quite ready to be used as a render target just yet. That requires one more step of indirection, known as a framebuffer.
-	//But first we'll have to set up the graphics pipeline.
-	m_GraphicsPipeline->CreateGraphicsPipeline();
+
+	m_RenderPass = new RenderPass(m_DeviceManager->GetLogicalDevice(), m_SwapChain->GetSwapChainImageFormat());
+	m_RenderPass->CreateRenderPass();
+
+
+	m_GraphicsPipeline->CreateGraphicsPipeline(m_DeviceManager->GetLogicalDevice(),m_RenderPass->Get());
 
 }
 
@@ -86,6 +96,9 @@ void VulkanApp::Run()
 }
 void VulkanApp::CleanUp()
 {
+	m_GraphicsPipeline->DestroyPipeline(m_DeviceManager->GetLogicalDevice());
+	m_GraphicsPipeline->DestroyPipelineLayout(m_DeviceManager->GetLogicalDevice());
+	m_RenderPass->DestroyRenderPass();
 	m_SwapChain->DestroyImageViews(m_DeviceManager->GetLogicalDevice());
 	m_SwapChain->DestroySwapChain(m_DeviceManager->GetLogicalDevice());
 	m_DeviceManager->DestroyLogicalDevice();

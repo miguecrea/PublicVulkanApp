@@ -24,8 +24,8 @@ public:
 	void createImageViews(VkDevice logicalDevice);
 	void DestroySwapChain(VkDevice logicalDevice);
 	void DestroyImageViews(VkDevice logicalDevice);
-
-	 void Init();
+	void Init();
+	 VkFormat GetSwapChainImageFormat();
 private:
 	VkSwapchainKHR swapChain;
 	DeviceManager * m_DeviceManager;

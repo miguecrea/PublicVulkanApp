@@ -49,7 +49,7 @@ find_program(GLSLANG_VALIDATOR glslangValidator
 )
 
 set(SHADER_DIR ${CMAKE_SOURCE_DIR}/shaders)
-set(SPIRV_DIR ${CMAKE_BINARY_DIR}/shaders)
+set(SPIRV_DIR ${CMAKE_SOURCE_DIR}/ShadersOutput)
 
 file(MAKE_DIRECTORY ${SPIRV_DIR})
 
@@ -91,7 +91,7 @@ file(GLOB_RECURSE APP_SOURCES
     ${CMAKE_SOURCE_DIR}/src/*.h
 )
 
-add_executable(VulkanTutorial ${APP_SOURCES}   "Headers/InstanceManager.h" "src/InstanceManager.cpp"  "src/Window.cpp" "Headers/Window.h" "src/VulkanApp.cpp" "Headers/VulkanApp.h"  "src/DeviceManager.cpp" "Headers/DeviceManager.h" "src/SwapChain.cpp" "Headers/SwapChain.h" "Headers/SwapChainSupportDetails.h" "src/GraphicsPipeline.cpp" "Headers/GraphicsPipeline.h")
+add_executable(VulkanTutorial ${APP_SOURCES}   "Headers/InstanceManager.h" "src/InstanceManager.cpp"  "src/Window.cpp" "Headers/Window.h" "src/VulkanApp.cpp" "Headers/VulkanApp.h"  "src/DeviceManager.cpp" "Headers/DeviceManager.h" "src/SwapChain.cpp" "Headers/SwapChain.h" "Headers/SwapChainSupportDetails.h" "src/GraphicsPipeline.cpp" "Headers/GraphicsPipeline.h" "src/RenderPass.cpp" "Headers/RenderPass.h")
 
 set_target_properties(VulkanTutorial PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
@@ -119,6 +119,11 @@ target_include_directories(VulkanTutorial
 target_compile_definitions(VulkanTutorial
     PRIVATE
         VULKAN_HPP_HANDLE_ERROR_OUT_OF_DATE_AS_SUCCESS
+)
+
+target_compile_definitions(VulkanTutorial
+    PRIVATE
+        PROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )
 
 # Make executable depend on shaders

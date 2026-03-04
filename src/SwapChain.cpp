@@ -36,6 +36,7 @@ void SwapChain::createSwapChain(VkPhysicalDevice physiscaldevice, VkDevice logic
 	createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
 	//specifies what kind of operations we'll use the images in the swap chain for.
+	// 
 	// In this tutorial we're going to render directly to them, which means that they're 
 	// used as color attachment. It is also possible that you'll render images to a separate
 	// image first to perform operations like post - processing.In that case you may use a value
@@ -86,6 +87,11 @@ void SwapChain::createSwapChain(VkPhysicalDevice physiscaldevice, VkDevice logic
 	swapChainExtent = extent;
 }
 
+
+VkFormat SwapChain::GetSwapChainImageFormat()
+{
+	return swapChainImageFormat;
+}
 void SwapChain::createImageViews(VkDevice logicalDevice)
 {
 	swapChainImageViews.resize(swapChainImages.size());
