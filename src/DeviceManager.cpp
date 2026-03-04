@@ -110,6 +110,16 @@ void DeviceManager::DestroyLogicalDevice()
     vkDestroyDevice(m_LogicalDevice, nullptr);
 }
 
+VkPhysicalDevice DeviceManager::GetPhysicalDevice()
+{
+    return m_physicalDevice;
+}
+
+VkDevice DeviceManager::GetLogicalDevice()
+{
+    return m_LogicalDevice;
+}
+
 //EXPLANATION :
 #pragma region QueueFamilyExplanation
  
@@ -175,8 +185,6 @@ QueueFamilyIndices DeviceManager::findQueueFamilies(VkPhysicalDevice device)
         if (presentSupport) {
             indices.presentFamily = i;
         }
-
-
 
         if (indices.isComplete()) {
             break;

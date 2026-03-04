@@ -23,11 +23,14 @@ public:
     void createLogicalDevice(InstanceManager * IntanceManager);
     void DestroyLogicalDevice();
     void SetSurface(VkSurfaceKHR surface) { m_Surface = surface;}
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+    VkPhysicalDevice GetPhysicalDevice();
+    VkDevice GetLogicalDevice();
+
 private:
     VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
     VkDevice m_LogicalDevice;
     bool isDeviceSuitable(VkPhysicalDevice device);
-    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 
 
     // ACTUAL QUEUE FAMILIES 
@@ -35,7 +38,6 @@ private:
     // Graphics queue we query it the the parameter and stored it's index
     VkQueue graphicsQueue;
     VkQueue presentQueue;
-
 
     // Needs the surface to find queue families 
     VkSurfaceKHR m_Surface = nullptr;

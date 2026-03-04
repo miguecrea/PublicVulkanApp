@@ -7,7 +7,7 @@ class Window;
 class InstanceManager;
 class DeviceManager;
 class SwapChain;
-
+class GraphicsPipeline;
 
 class VulkanApp final
 {
@@ -25,6 +25,7 @@ private:
     InstanceManager * m_InstanceManager;
     DeviceManager * m_DeviceManager;
     SwapChain * m_SwapChain;
+    GraphicsPipeline * m_GraphicsPipeline;
     void  setupDebugMessenger();
 };
 

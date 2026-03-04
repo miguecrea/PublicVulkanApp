@@ -3,6 +3,7 @@
 #include"../Headers/InstanceManager.h"
 #include"../Headers/DeviceManager.h"
 #include"../Headers/SwapChain.h"
+#include"../Headers/GraphicsPipeline.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -14,8 +15,8 @@ VulkanApp::VulkanApp()
 	m_Window = new Window();
 	m_InstanceManager = new InstanceManager();
 	m_DeviceManager = new DeviceManager();
-	m_SwapChain = new SwapChain();
-
+	m_SwapChain = new SwapChain(m_DeviceManager);
+	m_GraphicsPipeline = new GraphicsPipeline();
 }
 VulkanApp::~VulkanApp()
 {
@@ -27,6 +28,12 @@ VulkanApp::~VulkanApp()
 
 	delete m_DeviceManager;
 	m_DeviceManager = nullptr;
+
+	delete m_SwapChain;
+	m_SwapChain = nullptr;
+
+	delete m_GraphicsPipeline;
+	m_GraphicsPipeline = nullptr;
 
 }
 void VulkanApp::InitWindow()
@@ -52,11 +59,14 @@ void VulkanApp::InitVulkan()
 
 	m_DeviceManager->pickPhysicalDevice(m_InstanceManager->GetVulkanInstance());
 	m_DeviceManager->createLogicalDevice(m_InstanceManager);
+	m_SwapChain->createSwapChain(m_DeviceManager->GetPhysicalDevice(),m_DeviceManager->GetLogicalDevice(), m_Window->surface, m_Window->GetWindow());
+	m_SwapChain->createImageViews(m_DeviceManager->GetLogicalDevice());
 
-	//The swap chain is essentially a queue of images that are waiting to be presented to the screen.Our application will acquire such an image to draw to it,
-		//and then return it to the queue
-	//The general purpose of the swap chain is to synchronize the presentation of images 
-	//	with the refresh rate of the screen.
+
+	//An image view is sufficient to start using an image as a texture, but it's not quite ready to be used as a render target just yet. That requires one more step of indirection, known as a framebuffer.
+	//But first we'll have to set up the graphics pipeline.
+	m_GraphicsPipeline->CreateGraphicsPipeline();
+
 }
 
 void VulkanApp::MainLoop()
@@ -76,6 +86,8 @@ void VulkanApp::Run()
 }
 void VulkanApp::CleanUp()
 {
+	m_SwapChain->DestroyImageViews(m_DeviceManager->GetLogicalDevice());
+	m_SwapChain->DestroySwapChain(m_DeviceManager->GetLogicalDevice());
 	m_DeviceManager->DestroyLogicalDevice();
 	m_InstanceManager->DestroyValidationLayers();
 	m_Window->DestroySurface(m_InstanceManager->GetVulkanInstance());
