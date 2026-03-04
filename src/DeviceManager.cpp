@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <set>
+#include"../Headers/SwapChain.h"
 
 DeviceManager::DeviceManager()
 {
@@ -27,7 +28,8 @@ void DeviceManager::pickPhysicalDevice(VkInstance Instance)
     {
         //if we found a device that support graphics queue family 
         //we stored the Index
-        if (isDeviceSuitable(device)) {
+        if (isDeviceSuitable(device))
+        {
             m_physicalDevice = device;
             break;
         }
@@ -65,19 +67,19 @@ void DeviceManager::createLogicalDevice(InstanceManager * IntanceManager)
         queueCreateInfos.push_back(queueCreateInfo);
     }
 
-
     // CREATE LOGICAL DEVICE USING THE DATA OF THE QUUE Create Info 
+
     VkPhysicalDeviceFeatures deviceFeatures{};
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
     createInfo.pEnabledFeatures = &deviceFeatures;
+    //enable swap chain extension
+    createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+    createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
 
-    // Specify device specific  extensions and validation layers for logical device 
-    //for now we dont need any device specifoc functionality 
-    createInfo.enabledExtensionCount = 0;
     if (IntanceManager->AreValidationLayersEnabled())
     {
         createInfo.enabledLayerCount = static_cast<uint32_t>(IntanceManager->validationLayers.size());
@@ -129,7 +131,18 @@ void DeviceManager::DestroyLogicalDevice()
 bool DeviceManager::isDeviceSuitable(VkPhysicalDevice device)
 {
     QueueFamilyIndices indices = findQueueFamilies(device);
-    return indices.isComplete();
+   
+    bool extensionsSupported = checkDeviceExtensionSupport(device);
+
+    
+    bool swapChainAdequate = false;
+    if (extensionsSupported)
+    {
+        SwapChainSupportDetails swapChainSupport = SwapChain::querySwapChainSupport(device,m_Surface);
+        swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
+    }
+
+    return indices.isComplete() && extensionsSupported && swapChainAdequate;
 }
 
 QueueFamilyIndices DeviceManager::findQueueFamilies(VkPhysicalDevice device)
@@ -173,4 +186,22 @@ QueueFamilyIndices DeviceManager::findQueueFamilies(VkPhysicalDevice device)
     }
 
     return indices;
+}
+
+bool DeviceManager::checkDeviceExtensionSupport(VkPhysicalDevice device)
+{
+    uint32_t extensionCount;
+    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+
+    std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+
+    std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
+
+    for (const auto & extension : availableExtensions)
+    {
+        requiredExtensions.erase(extension.extensionName);
+    }
+
+    return requiredExtensions.empty();
 }

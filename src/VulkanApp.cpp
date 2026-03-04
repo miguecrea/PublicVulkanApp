@@ -2,6 +2,7 @@
 #include"../Headers/Window.h"
 #include"../Headers/InstanceManager.h"
 #include"../Headers/DeviceManager.h"
+#include"../Headers/SwapChain.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -13,6 +14,8 @@ VulkanApp::VulkanApp()
 	m_Window = new Window();
 	m_InstanceManager = new InstanceManager();
 	m_DeviceManager = new DeviceManager();
+	m_SwapChain = new SwapChain();
+
 }
 VulkanApp::~VulkanApp()
 {
@@ -50,6 +53,10 @@ void VulkanApp::InitVulkan()
 	m_DeviceManager->pickPhysicalDevice(m_InstanceManager->GetVulkanInstance());
 	m_DeviceManager->createLogicalDevice(m_InstanceManager);
 
+	//The swap chain is essentially a queue of images that are waiting to be presented to the screen.Our application will acquire such an image to draw to it,
+		//and then return it to the queue
+	//The general purpose of the swap chain is to synchronize the presentation of images 
+	//	with the refresh rate of the screen.
 }
 
 void VulkanApp::MainLoop()

@@ -1,6 +1,7 @@
 #pragma once
 #include <vulkan/vulkan.h>
 #include <optional>
+#include<vector>
 
 
 class InstanceManager;
@@ -8,7 +9,6 @@ struct QueueFamilyIndices
 {
     std::optional<uint32_t> graphicsFamily;
     std::optional<uint32_t> presentFamily;
-
     bool isComplete() 
     {
         return graphicsFamily.has_value() && presentFamily.has_value();
@@ -37,7 +37,14 @@ private:
     VkQueue presentQueue;
 
 
-    // Needs the surface to find queue fa,ilies 
+    // Needs the surface to find queue families 
     VkSurfaceKHR m_Surface = nullptr;
+
+    const std::vector<const char*> deviceExtensions = 
+    {
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    };
+
+   bool checkDeviceExtensionSupport(VkPhysicalDevice device);
 
 };

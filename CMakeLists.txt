@@ -91,7 +91,7 @@ file(GLOB_RECURSE APP_SOURCES
     ${CMAKE_SOURCE_DIR}/src/*.h
 )
 
-add_executable(VulkanTutorial ${APP_SOURCES} "src/Device.cpp" "Headers/Device.h" "Headers/InstanceManager.h" "src/InstanceManager.cpp"  "src/Window.cpp" "Headers/Window.h" "src/VulkanApp.cpp" "Headers/VulkanApp.h"  "src/DeviceManager.cpp" "Headers/DeviceManager.h")
+add_executable(VulkanTutorial ${APP_SOURCES}   "Headers/InstanceManager.h" "src/InstanceManager.cpp"  "src/Window.cpp" "Headers/Window.h" "src/VulkanApp.cpp" "Headers/VulkanApp.h"  "src/DeviceManager.cpp" "Headers/DeviceManager.h" "src/SwapChain.cpp" "Headers/SwapChain.h" "Headers/SwapChainSupportDetails.h")
 
 set_target_properties(VulkanTutorial PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
