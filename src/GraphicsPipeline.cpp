@@ -251,3 +251,8 @@ void GraphicsPipeline::DestroyPipeline(VkDevice logicalDevice)
     vkDestroyPipeline(logicalDevice,graphicsPipeline, nullptr);
 
 }
+
+VkPipeline GraphicsPipeline::GetPipeline()
+{
+    return graphicsPipeline;
+}

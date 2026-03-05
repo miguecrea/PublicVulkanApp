@@ -28,7 +28,7 @@ public:
 	 VkFormat GetSwapChainImageFormat();
 	 std::vector<VkImageView> GetSwapChainImageViews();
 	 VkExtent2D GetExtend();
-
+	 VkSwapchainKHR Get();
 private:
 	VkSwapchainKHR swapChain;
 	DeviceManager * m_DeviceManager;

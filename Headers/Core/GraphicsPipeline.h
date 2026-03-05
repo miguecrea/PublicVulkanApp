@@ -1,5 +1,5 @@
 
-
+#pragma once
 #include <vulkan/vulkan.h>
 #include <vector>
 #include<string>
@@ -13,6 +13,8 @@ public:
     static std::vector<char> readFile(const std::string & filename);
     void DestroyPipelineLayout(VkDevice logicalDevice);
     void DestroyPipeline(VkDevice logicalDevice);
+
+    VkPipeline GetPipeline();
 private:
     VkShaderModule createShaderModule(const std::vector<char>& code, VkDevice device);
     VkPipelineLayout pipelineLayout;

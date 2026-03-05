@@ -2,6 +2,12 @@
 #include <stdexcept>
 #include <iostream>
 
+
+
+//An image view is sufficient to start using an image as a texture, but it's not quite ready to be used as a render target just yet. 
+// That requires one more step of indirection, known as a framebuffer.
+//But first we'll have to set up the graphics pipeline.
+
 FramebufferManager::FramebufferManager(VkDevice device):
 	m_Device{device}
 {
@@ -32,6 +38,11 @@ void FramebufferManager::CreateFramebuffers(VkRenderPass renderPass, const std::
             throw std::runtime_error("failed to create framebuffer!");
         }
     }
+}
+
+const std::vector<VkFramebuffer> &  FramebufferManager::GetFrameBuffers()
+{
+    return swapChainFramebuffers;
 }
 
 void FramebufferManager::DestroyFrameBuffers()

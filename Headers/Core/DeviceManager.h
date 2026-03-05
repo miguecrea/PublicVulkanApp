@@ -2,19 +2,9 @@
 #include <vulkan/vulkan.h>
 #include <optional>
 #include<vector>
-
+#include"QueueFamilyIndicesHeader.h"
 
 class InstanceManager;
-struct QueueFamilyIndices
-{
-    std::optional<uint32_t> graphicsFamily;
-    std::optional<uint32_t> presentFamily;
-    bool isComplete() 
-    {
-        return graphicsFamily.has_value() && presentFamily.has_value();
-    }
-};
-
 class DeviceManager
 {
 public:
@@ -27,7 +17,13 @@ public:
     VkPhysicalDevice GetPhysicalDevice();
     VkDevice GetLogicalDevice();
 
+    QueueFamilyIndices GetFamilyIndices();
+
+    VkQueue GetGraphicsQueue();
+    VkQueue GetPresentQueue();
+
 private:
+    QueueFamilyIndices m_indices;
     VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
     VkDevice m_LogicalDevice;
     bool isDeviceSuitable(VkPhysicalDevice device);

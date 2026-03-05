@@ -1,7 +1,7 @@
 #pragma once
 
-#pragma once
 #include "../Headers/Core/VulkanApp.h"
+#include <vulkan/vulkan.h>
 
 class Window;
 class InstanceManager;
@@ -10,13 +10,24 @@ class SwapChain;
 class GraphicsPipeline;
 class RenderPass;
 class FramebufferManager;
+class CommandManager;
 
-class VulkanApp final
+class Renderer final
 {
 public:
-    VulkanApp();
-    ~VulkanApp();
+    Renderer();
+    ~Renderer();
     void Run();
+
+    void DrawFrame();
+
+    VkSemaphore imageAvailableSemaphore;
+    VkSemaphore renderFinishedSemaphore;
+    VkFence inFlightFence;
+
+    void createSemaphoresObjects(VkDevice device);
+    void DestroySemaphoresObjects(VkDevice device);
+
 private:
     void InitWindow();
     void InitVulkan();
@@ -30,6 +41,7 @@ private:
     GraphicsPipeline * m_GraphicsPipeline;
     RenderPass * m_RenderPass;
     FramebufferManager * m_FrameBuffer;
+    CommandManager * m_CommandManager;
     void  setupDebugMessenger();
 };
 

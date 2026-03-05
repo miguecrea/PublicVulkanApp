@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <iostream>
 #include"../Headers/Core/DeviceManager.h"
+
 SwapChain::SwapChain(DeviceManager * deviceManager):
 	m_DeviceManager{deviceManager}
 {
@@ -99,6 +100,10 @@ std::vector<VkImageView> SwapChain::GetSwapChainImageViews()
 VkExtent2D SwapChain::GetExtend()
 {
 	return swapChainExtent;
+}
+VkSwapchainKHR SwapChain::Get()
+{
+	return swapChain;
 }
 void SwapChain::createImageViews(VkDevice logicalDevice)
 {

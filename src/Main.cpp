@@ -9,7 +9,7 @@
 int main() 
 {
 
-    VulkanApp app;
+    Renderer app;
 
     try 
     {

@@ -89,7 +89,8 @@ void InstanceManager::DestroyValidationLayers()
 }
 
 
-bool InstanceManager::checkValidationLayerSupport() {
+bool InstanceManager::checkValidationLayerSupport() 
+{
     uint32_t layerCount;
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 

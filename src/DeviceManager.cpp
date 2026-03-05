@@ -50,11 +50,11 @@ void DeviceManager::createLogicalDevice(InstanceManager * IntanceManager)
 {
 
     //QUEUE FAMILY
-    QueueFamilyIndices indices = findQueueFamilies(m_physicalDevice);
+    m_indices = findQueueFamilies(m_physicalDevice);
 
     //set in case they are In the same Index 
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    std::set<uint32_t> uniqueQueueFamilies = { indices.graphicsFamily.value(), indices.presentFamily.value() };
+    std::set<uint32_t> uniqueQueueFamilies = { m_indices.graphicsFamily.value(), m_indices.presentFamily.value() };
 
     float queuePriority = 1.0f;
     for (uint32_t queueFamily : uniqueQueueFamilies) 
@@ -96,9 +96,9 @@ void DeviceManager::createLogicalDevice(InstanceManager * IntanceManager)
     }
 
     //we stored the graphics queue family in a Handle 
-    vkGetDeviceQueue(m_LogicalDevice,indices.graphicsFamily.value(), 0, &graphicsQueue);
+    vkGetDeviceQueue(m_LogicalDevice,m_indices.graphicsFamily.value(), 0, &graphicsQueue);
     //store present family in a handle 
-    vkGetDeviceQueue(m_LogicalDevice, indices.presentFamily.value(), 0, &presentQueue);
+    vkGetDeviceQueue(m_LogicalDevice, m_indices.presentFamily.value(), 0, &presentQueue);
 
 
 
@@ -118,6 +118,21 @@ VkPhysicalDevice DeviceManager::GetPhysicalDevice()
 VkDevice DeviceManager::GetLogicalDevice()
 {
     return m_LogicalDevice;
+}
+
+QueueFamilyIndices DeviceManager::GetFamilyIndices()
+{
+    return m_indices;
+}
+
+VkQueue DeviceManager::GetGraphicsQueue()
+{
+    return graphicsQueue;
+}
+
+VkQueue DeviceManager::GetPresentQueue()
+{
+    return presentQueue;
 }
 
 //EXPLANATION :

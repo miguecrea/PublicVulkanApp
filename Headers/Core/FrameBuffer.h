@@ -14,6 +14,9 @@ public:
         VkExtent2D extent
     );
 
+
+    const std::vector<VkFramebuffer>& GetFrameBuffers();
+
     void DestroyFrameBuffers();
    // const std::vector<VkFramebuffer>& GetFramebuffers() const;
 
