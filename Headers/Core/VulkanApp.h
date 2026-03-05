@@ -1,7 +1,7 @@
 #pragma once
 
 #pragma once
-#include "../Headers/VulkanApp.h"
+#include "../Headers/Core/VulkanApp.h"
 
 class Window;
 class InstanceManager;
@@ -9,6 +9,7 @@ class DeviceManager;
 class SwapChain;
 class GraphicsPipeline;
 class RenderPass;
+class FramebufferManager;
 
 class VulkanApp final
 {
@@ -28,6 +29,7 @@ private:
     SwapChain * m_SwapChain;
     GraphicsPipeline * m_GraphicsPipeline;
     RenderPass * m_RenderPass;
+    FramebufferManager * m_FrameBuffer;
     void  setupDebugMessenger();
 };
 

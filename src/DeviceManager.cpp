@@ -1,11 +1,11 @@
-#include"../Headers/DeviceManager.h"
-#include"../Headers/InstanceManager.h"
+#include"../Headers/Core/DeviceManager.h"
+#include"../Headers/Core/InstanceManager.h"
 #include <vector>
 #include <optional>
 #include <stdexcept>
 #include <iostream>
 #include <set>
-#include"../Headers/SwapChain.h"
+#include"../Headers/Core/SwapChain.h"
 
 DeviceManager::DeviceManager()
 {

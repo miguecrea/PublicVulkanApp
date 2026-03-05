@@ -1,11 +1,11 @@
 
-#include"../Headers/SwapChain.h"
+#include"../Headers/Core/SwapChain.h"
 #include <cstdint> // Necessary for uint32_t
 #include <limits> // Necessary for std::numeric_limits
 #include <algorithm> // Necessary for std::clamp
 #include <stdexcept>
 #include <iostream>
-#include"../Headers/DeviceManager.h"
+#include"../Headers/Core/DeviceManager.h"
 SwapChain::SwapChain(DeviceManager * deviceManager):
 	m_DeviceManager{deviceManager}
 {
@@ -91,6 +91,14 @@ void SwapChain::createSwapChain(VkPhysicalDevice physiscaldevice, VkDevice logic
 VkFormat SwapChain::GetSwapChainImageFormat()
 {
 	return swapChainImageFormat;
+}
+std::vector<VkImageView> SwapChain::GetSwapChainImageViews()
+{
+	return swapChainImageViews;
+}
+VkExtent2D SwapChain::GetExtend()
+{
+	return swapChainExtent;
 }
 void SwapChain::createImageViews(VkDevice logicalDevice)
 {

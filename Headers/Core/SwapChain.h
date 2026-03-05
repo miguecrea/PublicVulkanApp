@@ -26,6 +26,9 @@ public:
 	void DestroyImageViews(VkDevice logicalDevice);
 	void Init();
 	 VkFormat GetSwapChainImageFormat();
+	 std::vector<VkImageView> GetSwapChainImageViews();
+	 VkExtent2D GetExtend();
+
 private:
 	VkSwapchainKHR swapChain;
 	DeviceManager * m_DeviceManager;

@@ -1,10 +1,11 @@
-#include"../Headers/VulkanApp.h"
-#include"../Headers/Window.h"
-#include"../Headers/InstanceManager.h"
-#include"../Headers/DeviceManager.h"
-#include"../Headers/SwapChain.h"
-#include"../Headers/GraphicsPipeline.h"
-#include"../Headers/RenderPass.h"
+#include"../Headers/Core/VulkanApp.h"
+#include"../Headers/Core/Window.h"
+#include"../Headers/Core/InstanceManager.h"
+#include"../Headers/Core/DeviceManager.h"
+#include"../Headers/Core/SwapChain.h"
+#include"../Headers/Core/GraphicsPipeline.h"
+#include"../Headers/Core/RenderPass.h"
+#include"../Headers/Core/FrameBuffer.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -39,6 +40,9 @@ VulkanApp::~VulkanApp()
 	delete m_RenderPass;
 	m_RenderPass = nullptr;
 
+	delete m_FrameBuffer;
+	m_FrameBuffer = nullptr;
+
 }
 void VulkanApp::InitWindow()
 {
@@ -68,14 +72,14 @@ void VulkanApp::InitVulkan()
 	// That requires one more step of indirection, known as a framebuffer.
 	//But first we'll have to set up the graphics pipeline.
 	m_SwapChain->createImageViews(m_DeviceManager->GetLogicalDevice());
-
-
-
 	m_RenderPass = new RenderPass(m_DeviceManager->GetLogicalDevice(), m_SwapChain->GetSwapChainImageFormat());
 	m_RenderPass->CreateRenderPass();
-
-
 	m_GraphicsPipeline->CreateGraphicsPipeline(m_DeviceManager->GetLogicalDevice(),m_RenderPass->Get());
+	m_FrameBuffer = new FramebufferManager(m_DeviceManager->GetLogicalDevice());
+	m_FrameBuffer->CreateFramebuffers(m_RenderPass->Get(), m_SwapChain->GetSwapChainImageViews(), m_SwapChain->GetExtend());
+
+
+
 
 }
 
@@ -96,6 +100,7 @@ void VulkanApp::Run()
 }
 void VulkanApp::CleanUp()
 {
+	m_FrameBuffer->DestroyFrameBuffers();
 	m_GraphicsPipeline->DestroyPipeline(m_DeviceManager->GetLogicalDevice());
 	m_GraphicsPipeline->DestroyPipelineLayout(m_DeviceManager->GetLogicalDevice());
 	m_RenderPass->DestroyRenderPass();
