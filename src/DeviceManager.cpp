@@ -110,7 +110,7 @@ void DeviceManager::DestroyLogicalDevice()
     vkDestroyDevice(m_LogicalDevice, nullptr);
 }
 
-VkPhysicalDevice DeviceManager::GetPhysicalDevice()
+const VkPhysicalDevice & DeviceManager::GetPhysicalDevice()
 {
     return m_physicalDevice;
 }
@@ -134,6 +134,37 @@ VkQueue DeviceManager::GetPresentQueue()
 {
     return presentQueue;
 }
+
+
+
+// // Graphics cards can offer different types of memory to allocate from. Each type of memory varies in terms of allowed operations
+// and performance characteristics
+// We may have more than one desirable property, so we should check if the result 
+// of the bitwise AND is not just non-zero, but equal to the desired properties bit field. If there is a memory type suitable for the buffer that also has
+// all of the properties we need,
+
+uint32_t DeviceManager::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties,VkPhysicalDevice Physicaldevice)
+{
+ 
+    // First we need to query info about the available types of memory using 
+  
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(Physicaldevice,&memProperties);
+
+
+    //find if a memory is suitable based on the bit filter we passed on top
+    //and it is properties like being able to map memory like  (VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) 
+    {
+        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+    throw std::runtime_error("failed to find suitable memory type!");
+}
+
+
+
 
 //EXPLANATION :
 #pragma region QueueFamilyExplanation

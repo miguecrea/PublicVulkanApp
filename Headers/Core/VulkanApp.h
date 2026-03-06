@@ -2,7 +2,8 @@
 
 #include "../Headers/Core/VulkanApp.h"
 #include <vulkan/vulkan.h>
-
+#include<vector>
+#include"memory.h"
 class Window;
 class InstanceManager;
 class DeviceManager;
@@ -11,6 +12,7 @@ class GraphicsPipeline;
 class RenderPass;
 class FramebufferManager;
 class CommandManager;
+class BufferManager;
 
 class Renderer final
 {
@@ -20,13 +22,18 @@ public:
     void Run();
 
     void DrawFrame();
+    std::vector<VkSemaphore> imageAvailableSemaphores;
+    std::vector<VkSemaphore> renderFinishedSemaphores;
+    std::vector<VkFence> inFlightFences;
+    uint32_t currentFrame = 0;
 
-    VkSemaphore imageAvailableSemaphore;
-    VkSemaphore renderFinishedSemaphore;
-    VkFence inFlightFence;
+    bool framebufferResized = false;
 
     void createSemaphoresObjects(VkDevice device);
     void DestroySemaphoresObjects(VkDevice device);
+
+    void RecreateSwapChain();
+    void CleanUpSwapChain();
 
 private:
     void InitWindow();
@@ -42,6 +49,7 @@ private:
     RenderPass * m_RenderPass;
     FramebufferManager * m_FrameBuffer;
     CommandManager * m_CommandManager;
+    BufferManager * m_vertexBuffer;
     void  setupDebugMessenger();
 };
 

@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 #include"QueueFamilyIndicesHeader.h"
 
+class BufferManager;
 
 class CommandManager
 {
@@ -17,10 +18,21 @@ public:
    const VkCommandBuffer & GetComandBuffer();
 
     //  that writes the commands we want to execute into a command buffer
-    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, VkRenderPass renderPass, const std::vector<VkFramebuffer>& frameBuffer, VkPipeline graphicspipeline, VkExtent2D extend);
-    const std::vector<VkCommandBuffer> & GetCommandBuffers() const;
+    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, VkRenderPass renderPass,
+        const std::vector<VkFramebuffer>& frameBuffer,
+        VkPipeline graphicspipeline, VkExtent2D extend,
+        BufferManager * vertexbuffer);
+    const std::vector<VkCommandBuffer> & GetCommandBuffersVector() const;
 
+
+    VkCommandPool GetCommandPool();
+
+    const int MAX_FRAMES_IN_FLIGHT = 2;
 private:
+
+
+    
+
     QueueFamilyIndices m_QueueFamilyIndices;
     VkDevice m_Device;
 

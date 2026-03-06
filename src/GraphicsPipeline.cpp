@@ -1,6 +1,7 @@
 #include "../Headers/Core/GraphicsPipeline.h"
 #include <fstream>
 
+#include"../Headers/Core/VertexBuffer.h"
 
 
 //create a vertex shader and a fragment shader 
@@ -56,10 +57,20 @@ void GraphicsPipeline::CreateGraphicsPipeline(VkDevice device,VkRenderPass Rende
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = 0;
-    vertexInputInfo.pVertexBindingDescriptions = nullptr; // Optional
-    vertexInputInfo.vertexAttributeDescriptionCount = 0;
-    vertexInputInfo.pVertexAttributeDescriptions = nullptr; // Optional
+
+
+    //gte the binding description so The vertex in this case 
+    auto bindingDescription = BufferManager::getBindingDescription();
+
+    //here get what is inside the vertex Pos Color Etc 
+    auto attributeDescriptions = BufferManager::getAttributeDescriptions();
+
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+
+
 
 
     //what kinf of geometry will be drawn from vetices 

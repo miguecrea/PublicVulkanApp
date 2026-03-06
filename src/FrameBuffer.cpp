@@ -40,6 +40,8 @@ void FramebufferManager::CreateFramebuffers(VkRenderPass renderPass, const std::
     }
 }
 
+
+
 const std::vector<VkFramebuffer> &  FramebufferManager::GetFrameBuffers()
 {
     return swapChainFramebuffers;

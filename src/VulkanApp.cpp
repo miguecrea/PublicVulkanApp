@@ -7,6 +7,7 @@
 #include"../Headers/Core/RenderPass.h"
 #include"../Headers/Core/FrameBuffer.h"
 #include"../Headers/Core/CommandManager.h"
+#include"../Headers/Core/VertexBuffer.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -44,36 +45,14 @@ Renderer::~Renderer()
 	delete m_FrameBuffer;
 	m_FrameBuffer = nullptr;
 
-}
-void Renderer::createSemaphoresObjects(VkDevice device)
-{
-	//create semaphore
-	VkSemaphoreCreateInfo semaphoreInfo{};
-	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+	delete m_CommandManager;
+	m_CommandManager = nullptr;
 
-	//create fence
-	VkFenceCreateInfo fenceInfo{};
-	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; //create fence signaled because on the first
-	//frame of the loop wiats for the fence to be signaled 
-	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	delete m_vertexBuffer;
+	m_vertexBuffer = nullptr;
 
-	if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS ||
-		vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS ||
-		vkCreateFence(device, &fenceInfo, nullptr, &inFlightFence) != VK_SUCCESS) {
-		throw std::runtime_error("failed to create semaphores!");
-	}
 
 }
-
-void Renderer::DestroySemaphoresObjects(VkDevice device)
-{
-	vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
-	vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
-	vkDestroyFence(device, inFlightFence, nullptr);
-}
-
-
-
 void Renderer::InitWindow()
 {
 	if (m_Window)
@@ -91,29 +70,23 @@ void Renderer::InitVulkan()
 	m_InstanceManager->CreateInstance();
 	m_InstanceManager->setupDebugMessenger();
 	m_Window->createSurface(m_InstanceManager->GetVulkanInstance());
-
 	//SET SURFACE TO BE USED FINDING QUEUUE FAMILY
 	m_DeviceManager->SetSurface(m_Window->surface);
-
 	m_DeviceManager->pickPhysicalDevice(m_InstanceManager->GetVulkanInstance());
 	m_DeviceManager->createLogicalDevice(m_InstanceManager);
 	m_SwapChain->createSwapChain(m_DeviceManager->GetPhysicalDevice(),m_DeviceManager->GetLogicalDevice(), m_Window->surface, m_Window->GetWindow());
-
 	m_SwapChain->createImageViews(m_DeviceManager->GetLogicalDevice());
 	m_RenderPass = new RenderPass(m_DeviceManager->GetLogicalDevice(), m_SwapChain->GetSwapChainImageFormat());
 	m_RenderPass->CreateRenderPass();
 	m_GraphicsPipeline->CreateGraphicsPipeline(m_DeviceManager->GetLogicalDevice(),m_RenderPass->Get());
 	m_FrameBuffer = new FramebufferManager(m_DeviceManager->GetLogicalDevice());
 	m_FrameBuffer->CreateFramebuffers(m_RenderPass->Get(), m_SwapChain->GetSwapChainImageViews(), m_SwapChain->GetExtend());
-
 	m_CommandManager = new CommandManager(m_DeviceManager->GetLogicalDevice(), m_DeviceManager->GetFamilyIndices());
+	m_vertexBuffer = new BufferManager(m_DeviceManager);
 	m_CommandManager->CreateCommandPool();
+	m_vertexBuffer->CreateVertexBuffer(m_CommandManager->GetCommandPool());
 	m_CommandManager->createCommandBuffer();
-
-
 	createSemaphoresObjects(m_DeviceManager->GetLogicalDevice()); //NO CLASSS 
-
-
 }
 
 void Renderer::MainLoop()
@@ -123,7 +96,6 @@ void Renderer::MainLoop()
 		glfwPollEvents();
 		DrawFrame();
 	}
-
 	vkDeviceWaitIdle(m_DeviceManager->GetLogicalDevice());
 }
 
@@ -189,19 +161,30 @@ void Renderer::DrawFrame()
 		//save_screenshot_to_disk() 
 #pragma endregion
 	// either any or all the fences , and timeout parameter
-	vkWaitForFences(m_DeviceManager->GetLogicalDevice(), 1, &inFlightFence, VK_TRUE, UINT64_MAX);
+	vkWaitForFences(m_DeviceManager->GetLogicalDevice(), 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 	//reset to unsiglaned state 
-	vkResetFences(m_DeviceManager->GetLogicalDevice(), 1, &inFlightFence);
 
 	//get image from swap Chain
 	uint32_t imageIndex;
-	vkAcquireNextImageKHR(m_DeviceManager->GetLogicalDevice(),m_SwapChain->Get(), UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+	VkResult result = vkAcquireNextImageKHR(m_DeviceManager->GetLogicalDevice(),m_SwapChain->Get(), UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+
+	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+		RecreateSwapChain();
+		return;
+	}
+	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+		throw std::runtime_error("failed to acquire swap chain image!");
+	}
+
+	vkResetFences(m_DeviceManager->GetLogicalDevice(), 1, &inFlightFences[currentFrame]);
 
 	//reset before recording 
-	vkResetCommandBuffer(m_CommandManager->GetComandBuffer(), 0);
+	vkResetCommandBuffer(m_CommandManager->GetCommandBuffersVector()[currentFrame], 0);
 
 	//record CommandBuffer
-	m_CommandManager->recordCommandBuffer(m_CommandManager->GetComandBuffer(), imageIndex,m_RenderPass->Get(),m_FrameBuffer->GetFrameBuffers(),m_GraphicsPipeline->GetPipeline(),m_SwapChain->GetExtend());
+	m_CommandManager->recordCommandBuffer(m_CommandManager->GetCommandBuffersVector()[currentFrame],
+		imageIndex, m_RenderPass->Get(), m_FrameBuffer->GetFrameBuffers(), m_GraphicsPipeline->GetPipeline(),
+		m_SwapChain->GetExtend(),m_vertexBuffer);
 
 
 	//submit command buffer 
@@ -211,7 +194,7 @@ void Renderer::DrawFrame()
 
 	// he first three parameters specify which semaphores to wait on before execution begins and in which stage(s) of
 	// the pipeline to wait
-	VkSemaphore waitSemaphores[] = {imageAvailableSemaphore};
+	VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
 	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 	submitInfo.waitSemaphoreCount = 1;
 	submitInfo.pWaitSemaphores = waitSemaphores;
@@ -220,18 +203,17 @@ void Renderer::DrawFrame()
 
 	//The next two parameters specify which command buffers to actually submit for execution.We simply submit the single command buffer we have.
 	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &m_CommandManager->GetComandBuffer();
+	submitInfo.pCommandBuffers = &m_CommandManager->GetCommandBuffersVector()[currentFrame];
 
 
-	VkSemaphore signalSemaphores[] = { renderFinishedSemaphore };
+	VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame]};
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = signalSemaphores;
 
 
-	if (vkQueueSubmit(m_DeviceManager->GetGraphicsQueue(), 1, &submitInfo, inFlightFence) != VK_SUCCESS) {
+	if (vkQueueSubmit(m_DeviceManager->GetGraphicsQueue(), 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
 		throw std::runtime_error("failed to submit draw command buffer!");
 	}
-
 
 	// The last step of drawing a frame is submitting the result back to the swap chain 
 	VkPresentInfoKHR presentInfo{};
@@ -245,21 +227,97 @@ void Renderer::DrawFrame()
 	presentInfo.pSwapchains = swapChains;
 	presentInfo.pImageIndices = &imageIndex;
 
-	vkQueuePresentKHR(m_DeviceManager->GetPresentQueue(), &presentInfo);
+	result = vkQueuePresentKHR(m_DeviceManager->GetPresentQueue(), &presentInfo);
 
 
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
+		framebufferResized = false;
+		RecreateSwapChain();
+	}
+	else if (result != VK_SUCCESS) {
+		throw std::runtime_error("failed to present swap chain image!");
+	}
+
+	currentFrame = (currentFrame + 1) % m_CommandManager->MAX_FRAMES_IN_FLIGHT;
+}
+void Renderer::createSemaphoresObjects(VkDevice device)
+{
+	imageAvailableSemaphores.resize(m_CommandManager->MAX_FRAMES_IN_FLIGHT);
+	renderFinishedSemaphores.resize(m_CommandManager->MAX_FRAMES_IN_FLIGHT);
+	inFlightFences.resize(m_CommandManager->MAX_FRAMES_IN_FLIGHT);
+
+	VkSemaphoreCreateInfo semaphoreInfo{};
+	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+	VkFenceCreateInfo fenceInfo{};
+	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;  //need to make it signaled 
+
+	for (size_t i = 0; i < m_CommandManager->MAX_FRAMES_IN_FLIGHT; i++) {
+		if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
+			vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
+			vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
+
+			throw std::runtime_error("failed to create synchronization objects for a frame!");
+		}
+	}
+}
+
+void Renderer::DestroySemaphoresObjects(VkDevice device)
+{
+
+	for (size_t i = 0; i < m_CommandManager->MAX_FRAMES_IN_FLIGHT; i++) 
+	{
+		vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
+		vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
+		vkDestroyFence(device, inFlightFences[i], nullptr);
+	}
 
 }
+
+void Renderer::RecreateSwapChain()
+{
+
+	int width = 0, height = 0;
+	glfwGetFramebufferSize(m_Window->GetWindow(), &width, &height);
+	while (width == 0 || height == 0) {
+		glfwGetFramebufferSize(m_Window->GetWindow(), &width, &height);
+		glfwWaitEvents();
+	}
+
+
+
+	vkDeviceWaitIdle(m_DeviceManager->GetLogicalDevice());
+
+	CleanUpSwapChain();
+
+	m_SwapChain->createSwapChain(m_DeviceManager->GetPhysicalDevice(), m_DeviceManager->GetLogicalDevice(), m_Window->surface, m_Window->GetWindow());
+	m_SwapChain->createImageViews(m_DeviceManager->GetLogicalDevice());
+	m_FrameBuffer->CreateFramebuffers(m_RenderPass->Get(), m_SwapChain->GetSwapChainImageViews(), m_SwapChain->GetExtend());
+
+}
+
+void Renderer::CleanUpSwapChain()
+{
+	m_FrameBuffer->DestroyFrameBuffers();
+	m_SwapChain->DestroyImageViews(m_DeviceManager->GetLogicalDevice());
+	m_SwapChain->DestroySwapChain(m_DeviceManager->GetLogicalDevice());
+
+}
+
 void Renderer::CleanUp()
 {
+
+	CleanUpSwapChain();
+
+	m_vertexBuffer->DestroyBuffer();
+	m_vertexBuffer->FreeMemoryBuffer();
+
 	DestroySemaphoresObjects(m_DeviceManager->GetLogicalDevice());
 	m_CommandManager->DestroyCommandPool();
-	m_FrameBuffer->DestroyFrameBuffers();
 	m_GraphicsPipeline->DestroyPipeline(m_DeviceManager->GetLogicalDevice());
 	m_GraphicsPipeline->DestroyPipelineLayout(m_DeviceManager->GetLogicalDevice());
 	m_RenderPass->DestroyRenderPass();
-	m_SwapChain->DestroyImageViews(m_DeviceManager->GetLogicalDevice());
-	m_SwapChain->DestroySwapChain(m_DeviceManager->GetLogicalDevice());
 	m_DeviceManager->DestroyLogicalDevice();
 	m_InstanceManager->DestroyValidationLayers();
 	m_Window->DestroySurface(m_InstanceManager->GetVulkanInstance());

@@ -22,6 +22,7 @@ public:
 	static SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
 	void createSwapChain(VkPhysicalDevice physiscaldevice, VkDevice logicalDevice, VkSurfaceKHR surface,GLFWwindow * window);
 	void createImageViews(VkDevice logicalDevice);
+
 	void DestroySwapChain(VkDevice logicalDevice);
 	void DestroyImageViews(VkDevice logicalDevice);
 	void Init();

@@ -1,4 +1,5 @@
 #include "../Headers/Core/CommandManager.h"
+#include "../Headers/Core/VertexBuffer.h"
 #include <stdexcept>
 #include <iostream>
 
@@ -45,12 +46,19 @@ void CommandManager::createCommandBuffer()
     // VK_COMMAND_BUFFER_LEVEL_SECONDARY: Cannot be submitted directly, 
 	// but can be called from primary command buffers.
 
+
+	//we need multiple command buffers to use frmaes in flight so GPu does not stall when 
+	//waiting fdor the next frame 
+	
+	m_CommandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+
 	VkCommandBufferAllocateInfo allocInfo{};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	allocInfo.commandPool = m_CommandPool;
 	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandBufferCount = 1;
-	if (vkAllocateCommandBuffers(m_Device, &allocInfo, &commandBuffer) != VK_SUCCESS) {
+	allocInfo.commandBufferCount = (uint32_t)m_CommandBuffers.size();
+
+	if (vkAllocateCommandBuffers(m_Device, &allocInfo, m_CommandBuffers.data()) != VK_SUCCESS) {
 		throw std::runtime_error("failed to allocate command buffers!");
 	}
 }
@@ -60,7 +68,7 @@ const VkCommandBuffer & CommandManager::GetComandBuffer()
 	return commandBuffer;
 }
 
-void CommandManager::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex,VkRenderPass renderPass,const std::vector<VkFramebuffer> & frameBuffer,VkPipeline graphicsPipeline,VkExtent2D swapChainExtent)
+void CommandManager::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex,VkRenderPass renderPass,const std::vector<VkFramebuffer> & frameBuffer,VkPipeline graphicsPipeline,VkExtent2D swapChainExtent,BufferManager * vertexbuffer)
 {
 	//always start by begin command buffer 
 	VkCommandBufferBeginInfo beginInfo{};
@@ -112,19 +120,38 @@ void CommandManager::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t
 	scissor.extent = swapChainExtent;
 	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
+
+
+	VkBuffer vertexBuffers[] = { vertexbuffer->GetVertexBuffer()};
+	VkDeviceSize offsets[] = { 0 };
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+
+
+
+
 //vertexCount: Even though we don't have a vertex buffer, we technically still have 3 vertices to draw.
 //instanceCount : Used for instanced rendering, use 1 if you're not doing that.
 //firstVertex : Used as an offset into the vertex buffer, defines the lowest value of gl_VertexIndex.
 //firstInstance : Used as an offset for instanced rendering, defines the lowest value of gl_InstanceIndex.
 
-	vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+	vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertexbuffer->GetVertices().size()), 1, 0, 0);
+
+	//vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 	vkCmdEndRenderPass(commandBuffer);
 
 	if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
 		throw std::runtime_error("failed to record command buffer!");
 	}
+}
 
+const std::vector<VkCommandBuffer>& CommandManager::GetCommandBuffersVector() const
+{
 
+	return m_CommandBuffers;
+}
 
-
+VkCommandPool CommandManager::GetCommandPool()
+{
+	return m_CommandPool;
 }

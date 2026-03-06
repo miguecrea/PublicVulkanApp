@@ -6,7 +6,6 @@
 
 
 //linked to the framebuffer at index 0 
-
 layout(location = 0) out vec4 outColor;
 
 //  means we get it from vertex 

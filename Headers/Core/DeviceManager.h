@@ -14,13 +14,15 @@ public:
     void DestroyLogicalDevice();
     void SetSurface(VkSurfaceKHR surface) { m_Surface = surface;}
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
-    VkPhysicalDevice GetPhysicalDevice();
+    const VkPhysicalDevice & GetPhysicalDevice();
     VkDevice GetLogicalDevice();
 
     QueueFamilyIndices GetFamilyIndices();
 
     VkQueue GetGraphicsQueue();
     VkQueue GetPresentQueue();
+
+    static uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties, VkPhysicalDevice device);
 
 private:
     QueueFamilyIndices m_indices;

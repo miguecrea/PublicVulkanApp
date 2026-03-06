@@ -12,8 +12,8 @@ public:
     Window();
     void initWindow();
     GLFWwindow * GetWindow();
-
     void createSurface(VkInstance Vulkaninstance);
     void DestroySurface(VkInstance Vulkaninstance);
     VkSurfaceKHR surface;
+
 };
