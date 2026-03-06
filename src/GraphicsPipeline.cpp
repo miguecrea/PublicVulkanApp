@@ -24,7 +24,7 @@
 
 
 
-void GraphicsPipeline::CreateGraphicsPipeline(VkDevice device,VkRenderPass RenderPass)
+void GraphicsPipeline::CreateGraphicsPipeline(VkDevice device,VkRenderPass RenderPass,VkDescriptorSetLayout desciptorSetLayOut)
 {
 
     auto vertShaderCode = readFile(std::string(PROJECT_SOURCE_DIR) + "/ShadersOutput/shader.vert.spv");
@@ -100,11 +100,18 @@ void GraphicsPipeline::CreateGraphicsPipeline(VkDevice device,VkRenderPass Rende
    // If depthClampEnable is set to VK_TRUE, then fragments that are beyond the near and
    // far planes are clamped to them as opposed to discarding them.This is useful in some special cases
    // like shadow maps.Using this requires enabling a GPU feature.
+
+
+
+
+
+
+    
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;  // fill fragments or just the edges etc 
     rasterizer.lineWidth = 1.0f; //number of fragments 
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;  //vertex order for faces 
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;  //vertex order for faces 
 
     // USED FOR SHADOW MAPPING:
 
@@ -172,11 +179,11 @@ void GraphicsPipeline::CreateGraphicsPipeline(VkDevice device,VkRenderPass Rende
 
 
     //Push constants is a thing to pass info to the shader at Runtime
+    
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 0;
-    pipelineLayoutInfo.pushConstantRangeCount = 0;
-
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &desciptorSetLayOut;
 
     // this is for values that will be bale to be modified at runtime 
     if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
@@ -266,4 +273,9 @@ void GraphicsPipeline::DestroyPipeline(VkDevice logicalDevice)
 VkPipeline GraphicsPipeline::GetPipeline()
 {
     return graphicsPipeline;
+}
+
+VkPipelineLayout GraphicsPipeline::GetpipelineLayout()
+{
+    return pipelineLayout;
 }

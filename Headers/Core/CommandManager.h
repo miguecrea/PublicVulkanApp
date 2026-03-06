@@ -21,7 +21,7 @@ public:
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, VkRenderPass renderPass,
         const std::vector<VkFramebuffer>& frameBuffer,
         VkPipeline graphicspipeline, VkExtent2D extend,
-        BufferManager * vertexbuffer);
+        BufferManager * vertexbuffer, class DescriptorSetLayout * descriptorSet, VkPipelineLayout pipleinelayout);
     const std::vector<VkCommandBuffer> & GetCommandBuffersVector() const;
 
 

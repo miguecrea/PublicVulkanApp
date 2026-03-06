@@ -13,6 +13,7 @@ class RenderPass;
 class FramebufferManager;
 class CommandManager;
 class BufferManager;
+class DescriptorSetLayout;
 
 class Renderer final
 {
@@ -35,6 +36,12 @@ public:
     void RecreateSwapChain();
     void CleanUpSwapChain();
 
+
+
+
+
+
+
 private:
     void InitWindow();
     void InitVulkan();
@@ -50,6 +57,7 @@ private:
     FramebufferManager * m_FrameBuffer;
     CommandManager * m_CommandManager;
     BufferManager * m_vertexBuffer;
+    DescriptorSetLayout * m_DescriptorSetsLayout;
     void  setupDebugMessenger();
 };
 

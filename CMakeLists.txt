@@ -91,7 +91,7 @@ file(GLOB_RECURSE APP_SOURCES
     ${CMAKE_SOURCE_DIR}/src/*.h
 )
 
-add_executable(VulkanTutorial ${APP_SOURCES}   "Headers/Core/InstanceManager.h" "src/InstanceManager.cpp"  "src/Window.cpp" "Headers/Core/Window.h" "src/VulkanApp.cpp" "Headers/Core/VulkanApp.h"  "src/DeviceManager.cpp" "Headers/Core/DeviceManager.h" "src/SwapChain.cpp" "Headers/Core/SwapChain.h" "Headers/Core/SwapChainSupportDetails.h" "src/GraphicsPipeline.cpp" "Headers/Core/GraphicsPipeline.h" "src/RenderPass.cpp" "Headers/Core/RenderPass.h" "src/FrameBuffer.cpp" "Headers/Core/FrameBuffer.h" "src/CommandManager.cpp" "Headers/Core/CommandManager.h" "Headers/Core/QueueFamilyIndicesHeader.h" "src/VertexBuffer.cpp" "Headers/Core/VertexBuffer.h")
+add_executable(VulkanTutorial ${APP_SOURCES}   "Headers/Core/InstanceManager.h" "src/InstanceManager.cpp"  "src/Window.cpp" "Headers/Core/Window.h" "src/VulkanApp.cpp" "Headers/Core/VulkanApp.h"  "src/DeviceManager.cpp" "Headers/Core/DeviceManager.h" "src/SwapChain.cpp" "Headers/Core/SwapChain.h" "Headers/Core/SwapChainSupportDetails.h" "src/GraphicsPipeline.cpp" "Headers/Core/GraphicsPipeline.h" "src/RenderPass.cpp" "Headers/Core/RenderPass.h" "src/FrameBuffer.cpp" "Headers/Core/FrameBuffer.h" "src/CommandManager.cpp" "Headers/Core/CommandManager.h" "Headers/Core/QueueFamilyIndicesHeader.h" "src/VertexBuffer.cpp" "Headers/Core/VertexBuffer.h" "src/DescriptorSetLayout.cpp" "Headers/Core/DescriptorSetLayout.h" "Headers/Core/Helpers.h")
 
 set_target_properties(VulkanTutorial PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin

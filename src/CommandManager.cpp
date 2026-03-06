@@ -1,5 +1,6 @@
 #include "../Headers/Core/CommandManager.h"
 #include "../Headers/Core/VertexBuffer.h"
+#include "../Headers/Core/DescriptorSetLayout.h"
 #include <stdexcept>
 #include <iostream>
 
@@ -68,7 +69,10 @@ const VkCommandBuffer & CommandManager::GetComandBuffer()
 	return commandBuffer;
 }
 
-void CommandManager::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex,VkRenderPass renderPass,const std::vector<VkFramebuffer> & frameBuffer,VkPipeline graphicsPipeline,VkExtent2D swapChainExtent,BufferManager * vertexbuffer)
+void CommandManager::recordCommandBuffer(VkCommandBuffer commandBuffer,
+	uint32_t imageIndex,VkRenderPass renderPass,const std::vector<VkFramebuffer> & frameBuffer,
+	VkPipeline graphicsPipeline,VkExtent2D swapChainExtent,BufferManager * vertexbuffer,
+	DescriptorSetLayout * descriptorSet,VkPipelineLayout pipleinelayout)
 {
 	//always start by begin command buffer 
 	VkCommandBufferBeginInfo beginInfo{};
@@ -134,6 +138,9 @@ void CommandManager::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t
 //firstInstance : Used as an offset for instanced rendering, defines the lowest value of gl_InstanceIndex.
 
 
+	//bind descriptorSets
+
+	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,pipleinelayout, 0, 1, &descriptorSet->GetdescriptorSets()[imageIndex], 0, nullptr);
 	vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(vertexbuffer->GetIndices().size()), 1, 0, 0, 0);
 
 

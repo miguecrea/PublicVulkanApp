@@ -8,6 +8,7 @@
 #include"../Headers/Core/FrameBuffer.h"
 #include"../Headers/Core/CommandManager.h"
 #include"../Headers/Core/VertexBuffer.h"
+#include"../Headers/Core/DescriptorSetLayout.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -21,6 +22,7 @@ Renderer::Renderer()
 	m_DeviceManager = new DeviceManager();
 	m_SwapChain = new SwapChain(m_DeviceManager);
 	m_GraphicsPipeline = new GraphicsPipeline();
+	
 }
 Renderer::~Renderer()
 {
@@ -51,6 +53,9 @@ Renderer::~Renderer()
 	delete m_vertexBuffer;
 	m_vertexBuffer = nullptr;
 
+	delete m_DescriptorSetsLayout;
+	m_DescriptorSetsLayout = nullptr;
+
 
 }
 void Renderer::InitWindow()
@@ -78,7 +83,10 @@ void Renderer::InitVulkan()
 	m_SwapChain->createImageViews(m_DeviceManager->GetLogicalDevice());
 	m_RenderPass = new RenderPass(m_DeviceManager->GetLogicalDevice(), m_SwapChain->GetSwapChainImageFormat());
 	m_RenderPass->CreateRenderPass();
-	m_GraphicsPipeline->CreateGraphicsPipeline(m_DeviceManager->GetLogicalDevice(),m_RenderPass->Get());
+
+	m_DescriptorSetsLayout = new DescriptorSetLayout(m_DeviceManager->GetLogicalDevice(),m_DeviceManager->GetPhysicalDevice(),m_SwapChain->GetExtend());
+	m_DescriptorSetsLayout->createDescriptorSetLayout();
+	m_GraphicsPipeline->CreateGraphicsPipeline(m_DeviceManager->GetLogicalDevice(),m_RenderPass->Get(),m_DescriptorSetsLayout->GetDescriptorSetLayout());
 	m_FrameBuffer = new FramebufferManager(m_DeviceManager->GetLogicalDevice());
 	m_FrameBuffer->CreateFramebuffers(m_RenderPass->Get(), m_SwapChain->GetSwapChainImageViews(), m_SwapChain->GetExtend());
 	m_CommandManager = new CommandManager(m_DeviceManager->GetLogicalDevice(), m_DeviceManager->GetFamilyIndices());
@@ -87,6 +95,10 @@ void Renderer::InitVulkan()
 	m_vertexBuffer->CreateVertexBuffer(m_CommandManager->GetCommandPool());
 	m_vertexBuffer->CreateIndexBuffer(m_CommandManager->GetCommandPool());
 
+
+	m_DescriptorSetsLayout->createUniformBuffers(m_CommandManager->MAX_FRAMES_IN_FLIGHT);
+	m_DescriptorSetsLayout->createDescriptorPool(m_CommandManager->MAX_FRAMES_IN_FLIGHT);
+	m_DescriptorSetsLayout->createDescriptorSets(m_CommandManager->MAX_FRAMES_IN_FLIGHT);
 	m_CommandManager->createCommandBuffer();
 	createSemaphoresObjects(m_DeviceManager->GetLogicalDevice()); //NO CLASSS 
 }
@@ -178,6 +190,8 @@ void Renderer::DrawFrame()
 		throw std::runtime_error("failed to acquire swap chain image!");
 	}
 
+	m_DescriptorSetsLayout->UpdateUniformBuffers(currentFrame);
+
 	vkResetFences(m_DeviceManager->GetLogicalDevice(), 1, &inFlightFences[currentFrame]);
 
 	//reset before recording 
@@ -186,7 +200,7 @@ void Renderer::DrawFrame()
 	//record CommandBuffer
 	m_CommandManager->recordCommandBuffer(m_CommandManager->GetCommandBuffersVector()[currentFrame],
 		imageIndex, m_RenderPass->Get(), m_FrameBuffer->GetFrameBuffers(), m_GraphicsPipeline->GetPipeline(),
-		m_SwapChain->GetExtend(),m_vertexBuffer);
+		m_SwapChain->GetExtend(),m_vertexBuffer,m_DescriptorSetsLayout,m_GraphicsPipeline->GetpipelineLayout());
 
 
 	//submit command buffer 
@@ -240,7 +254,7 @@ void Renderer::DrawFrame()
 		throw std::runtime_error("failed to present swap chain image!");
 	}
 
-	currentFrame = (currentFrame + 1) % m_CommandManager->MAX_FRAMES_IN_FLIGHT;
+	currentFrame = (currentFrame + 1) % m_CommandManager->MAX_FRAMES_IN_FLIGHT - 1 ;
 }
 void Renderer::createSemaphoresObjects(VkDevice device)
 {
@@ -311,8 +325,11 @@ void Renderer::CleanUp()
 {
 
 	CleanUpSwapChain();
+	//here 
 
-
+	m_DescriptorSetsLayout->DestroyUniformBuffers(m_CommandManager->MAX_FRAMES_IN_FLIGHT);
+	m_DescriptorSetsLayout->DestroyDescriptorPool();
+	m_DescriptorSetsLayout->DestroyDescriptorSetLayout();
 	m_vertexBuffer->DestroyIndexBuffer();
 	m_vertexBuffer->FreeIndexMemoryBuffer();
 	m_vertexBuffer->DestroyVertexBuffer();
