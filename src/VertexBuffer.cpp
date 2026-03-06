@@ -13,6 +13,11 @@ VkBuffer BufferManager::GetVertexBuffer()
 	return vertexBuffer;
 }
 
+VkBuffer BufferManager::GetIndexBuffer()
+{
+	return indexBuffer;
+}
+
 void BufferManager::CreateVertexBuffer(VkCommandPool commandPool)
 {
 
@@ -102,6 +107,30 @@ void BufferManager::CreateVertexBuffer(VkCommandPool commandPool)
 
 }
 
+void BufferManager::CreateIndexBuffer(VkCommandPool commandPool)
+{
+
+
+	VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+	void * data;
+	vkMapMemory(m_deviceManager->GetLogicalDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
+	memcpy(data, indices.data(), (size_t)bufferSize);
+	vkUnmapMemory(m_deviceManager->GetLogicalDevice(), stagingBufferMemory);
+
+	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT 
+		| VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+
+	copyBuffer(stagingBuffer, indexBuffer, bufferSize, commandPool);
+
+	vkDestroyBuffer(m_deviceManager->GetLogicalDevice(), stagingBuffer, nullptr);
+	vkFreeMemory(m_deviceManager->GetLogicalDevice(), stagingBufferMemory, nullptr);
+}
+
 void BufferManager::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer  & buffer, VkDeviceMemory & bufferMemory)
 {
 
@@ -171,13 +200,26 @@ void BufferManager::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceS
 	vkFreeCommandBuffers(m_deviceManager->GetLogicalDevice(), commandPool, 1, &commandBuffer);
 }
 
+void BufferManager::DestroyIndexBuffer()
+{
+	vkDestroyBuffer(m_deviceManager->GetLogicalDevice(), indexBuffer, nullptr);
 
-void BufferManager::DestroyBuffer()
+}
+
+void BufferManager::FreeIndexMemoryBuffer()
+{
+
+	vkFreeMemory(m_deviceManager->GetLogicalDevice(), indexBufferMemory, nullptr);
+
+}
+
+
+void BufferManager::DestroyVertexBuffer()
 {
 	vkDestroyBuffer(m_deviceManager->GetLogicalDevice(), vertexBuffer, nullptr);
 }
 
-void BufferManager::FreeMemoryBuffer()
+void BufferManager::FreeVertexMemoryBuffer()
 {
 	vkFreeMemory(m_deviceManager->GetLogicalDevice(), vertexBufferMemory, nullptr);
 }

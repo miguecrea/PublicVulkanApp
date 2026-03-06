@@ -17,44 +17,53 @@ class BufferManager
 private:
 
 	DeviceManager * m_deviceManager;
-
-
 	//vertex buffer 
 	VkBuffer vertexBuffer;
 	VkDeviceMemory vertexBufferMemory;
-
 
 	//index buffer 
 	VkBuffer indexBuffer;
 	VkDeviceMemory indexBufferMemory;
 
-	const std::vector<Vertex> vertices =
-	{
-		{{0.0f, -0.2f}, {1.0f, 0.0f, 0.0f}},
-		{{0.5f, 0.5f}, {1.0f, 1.0f, 0.0f}},
-		{{-0.5f, 0.5f}, {1.0f, 0.0f, 1.0f}}
+
+	const std::vector<Vertex> vertices = {
+	{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+	{{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+	{{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+	{{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
 	};
 
-	const std::vector<uint16_t> indices = 
-	{
-	0, 1, 2, 2, 3, 0
+	const std::vector<uint16_t> indices = {
+		0, 1, 2, 2, 3, 0
 	};
 
 public:
 
 	BufferManager(DeviceManager * deviceManager);
 	VkBuffer GetVertexBuffer();
+	VkBuffer GetIndexBuffer();
 	void CreateVertexBuffer(VkCommandPool commandPool);
+	void CreateIndexBuffer(VkCommandPool commandPool);
+
+
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer & buffer, VkDeviceMemory& bufferMemory);
 	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkCommandPool commandPool);
 
-	void DestroyBuffer();
-	void FreeMemoryBuffer();
 
+	void DestroyIndexBuffer();
+	void FreeIndexMemoryBuffer();
+
+	void DestroyVertexBuffer();
+	void FreeVertexMemoryBuffer();
 
 	const std::vector<Vertex>& GetVertices()
 	{
 		return vertices;
+	}
+
+	const std::vector<uint16_t> GetIndices()
+	{
+		return indices;
 	}
 	static VkVertexInputBindingDescription getBindingDescription()
 	{

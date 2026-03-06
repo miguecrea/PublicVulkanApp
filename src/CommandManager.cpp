@@ -126,18 +126,17 @@ void CommandManager::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t
 	VkDeviceSize offsets[] = { 0 };
 	vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-
-
-
+	vkCmdBindIndexBuffer(commandBuffer, vertexbuffer->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT16);
 
 //vertexCount: Even though we don't have a vertex buffer, we technically still have 3 vertices to draw.
 //instanceCount : Used for instanced rendering, use 1 if you're not doing that.
 //firstVertex : Used as an offset into the vertex buffer, defines the lowest value of gl_VertexIndex.
 //firstInstance : Used as an offset for instanced rendering, defines the lowest value of gl_InstanceIndex.
 
-	vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertexbuffer->GetVertices().size()), 1, 0, 0);
 
-	//vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+	vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(vertexbuffer->GetIndices().size()), 1, 0, 0, 0);
+
+
 	vkCmdEndRenderPass(commandBuffer);
 
 	if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {

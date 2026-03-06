@@ -85,6 +85,8 @@ void Renderer::InitVulkan()
 	m_vertexBuffer = new BufferManager(m_DeviceManager);
 	m_CommandManager->CreateCommandPool();
 	m_vertexBuffer->CreateVertexBuffer(m_CommandManager->GetCommandPool());
+	m_vertexBuffer->CreateIndexBuffer(m_CommandManager->GetCommandPool());
+
 	m_CommandManager->createCommandBuffer();
 	createSemaphoresObjects(m_DeviceManager->GetLogicalDevice()); //NO CLASSS 
 }
@@ -310,8 +312,11 @@ void Renderer::CleanUp()
 
 	CleanUpSwapChain();
 
-	m_vertexBuffer->DestroyBuffer();
-	m_vertexBuffer->FreeMemoryBuffer();
+
+	m_vertexBuffer->DestroyIndexBuffer();
+	m_vertexBuffer->FreeIndexMemoryBuffer();
+	m_vertexBuffer->DestroyVertexBuffer();
+	m_vertexBuffer->FreeVertexMemoryBuffer();
 
 	DestroySemaphoresObjects(m_DeviceManager->GetLogicalDevice());
 	m_CommandManager->DestroyCommandPool();
