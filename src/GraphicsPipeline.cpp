@@ -168,7 +168,8 @@ void GraphicsPipeline::CreateGraphicsPipeline(VkDevice device,VkRenderPass Rende
 
 
     //state that can chnaged without recreating pipeline At Runtime 
-    std::vector<VkDynamicState> dynamicStates = {
+    std::vector<VkDynamicState> dynamicStates = 
+    {
         VK_DYNAMIC_STATE_VIEWPORT,
         VK_DYNAMIC_STATE_SCISSOR
     };

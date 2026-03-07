@@ -2,9 +2,10 @@
 #include <stdexcept>
 #include <iostream>
 #include"../Headers/Core/DeviceManager.h"
+#include"../Headers/Core/Helpers.h"
 
-BufferManager::BufferManager(DeviceManager * deviceManager) :
-	m_deviceManager{deviceManager}
+BufferManager::BufferManager(DeviceManager * deviceManager,VkCommandPool CommandPool) :
+	m_deviceManager{deviceManager},m_CommandPool{CommandPool}
 {
 }
 
@@ -18,7 +19,7 @@ VkBuffer BufferManager::GetIndexBuffer()
 	return indexBuffer;
 }
 
-void BufferManager::CreateVertexBuffer(VkCommandPool commandPool)
+void BufferManager::CreateVertexBuffer()
 {
 
 
@@ -27,7 +28,7 @@ void BufferManager::CreateVertexBuffer(VkCommandPool commandPool)
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
-	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+	createBuffer(m_deviceManager->GetLogicalDevice(),m_deviceManager->GetPhysicalDevice(), bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
 	// VK_BUFFER_USAGE_TRANSFER_SRC_BIT: Buffer can be used as source in a memory transfer operation.
 	//VK_BUFFER_USAGE_TRANSFER_DST_BIT: Buffer can be used as destination in a memory transfer operation.
@@ -40,13 +41,13 @@ void BufferManager::CreateVertexBuffer(VkCommandPool commandPool)
 
 	////staging buffer 
 	// The vertexBuffer is now allocated from a memory type that is device local,
-	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+	createBuffer(m_deviceManager->GetLogicalDevice(), m_deviceManager->GetPhysicalDevice(),bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		vertexBuffer, vertexBufferMemory);
 
      // he vertexBuffer is now allocated from a memory type that is device local, which generally means that we're not able to use vkMapMemory. 
      // However, we can copy data from the stagingBuffer to the vertexBuffer.
-	copyBuffer(stagingBuffer, vertexBuffer, bufferSize,commandPool);
+	copyBuffer(stagingBuffer, vertexBuffer, bufferSize,m_CommandPool);
 	vkDestroyBuffer(m_deviceManager->GetLogicalDevice(), stagingBuffer, nullptr);
 	vkFreeMemory(m_deviceManager->GetLogicalDevice(), stagingBufferMemory, nullptr);
 
@@ -107,7 +108,7 @@ void BufferManager::CreateVertexBuffer(VkCommandPool commandPool)
 
 }
 
-void BufferManager::CreateIndexBuffer(VkCommandPool commandPool)
+void BufferManager::CreateIndexBuffer()
 {
 
 
@@ -115,89 +116,99 @@ void BufferManager::CreateIndexBuffer(VkCommandPool commandPool)
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
-	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+	createBuffer(m_deviceManager->GetLogicalDevice(), m_deviceManager->GetPhysicalDevice(),bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
 	void * data;
 	vkMapMemory(m_deviceManager->GetLogicalDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
 	memcpy(data, indices.data(), (size_t)bufferSize);
 	vkUnmapMemory(m_deviceManager->GetLogicalDevice(), stagingBufferMemory);
 
-	createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT 
+	createBuffer(m_deviceManager->GetLogicalDevice(), m_deviceManager->GetPhysicalDevice(),bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT
 		| VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
 
-	copyBuffer(stagingBuffer, indexBuffer, bufferSize, commandPool);
+	copyBuffer(stagingBuffer, indexBuffer, bufferSize,m_CommandPool);
 
 	vkDestroyBuffer(m_deviceManager->GetLogicalDevice(), stagingBuffer, nullptr);
 	vkFreeMemory(m_deviceManager->GetLogicalDevice(), stagingBufferMemory, nullptr);
 }
 
-void BufferManager::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer  & buffer, VkDeviceMemory & bufferMemory)
-{
 
-	VkBufferCreateInfo bufferInfo{};
-	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferInfo.size = size;
-	bufferInfo.usage = usage;
-	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	if (vkCreateBuffer(m_deviceManager->GetLogicalDevice(), &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
-		throw std::runtime_error("failed to create buffer!");
-	}
+//inline VkCommandBuffer BufferManager::beginSingleTimeCommands()
+//{
+//	VkCommandBufferAllocateInfo allocInfo{};
+//	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+//	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+//	allocInfo.commandPool = m_CommandPool;
+//	allocInfo.commandBufferCount = 1;
+//
+//	VkCommandBuffer commandBuffer;
+//
+//	vkAllocateCommandBuffers(m_deviceManager->GetLogicalDevice(), &allocInfo, &commandBuffer);
+//
+//	VkCommandBufferBeginInfo beginInfo{};
+//	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+//	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+//
+//	vkBeginCommandBuffer(commandBuffer, &beginInfo);
+//
+//	return commandBuffer;
+//}
+//
+//inline void BufferManager::endSingleTimeCommands(VkCommandBuffer commandBuffer)
+//{
+//	vkEndCommandBuffer(commandBuffer);
+//
+//	VkSubmitInfo submitInfo{};
+//	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+//	submitInfo.commandBufferCount = 1;
+//	submitInfo.pCommandBuffers = &commandBuffer;
+//
+//	vkQueueSubmit(m_deviceManager->GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+//	vkQueueWaitIdle(m_deviceManager->GetGraphicsQueue());
+//
+//	vkFreeCommandBuffers(m_deviceManager->GetLogicalDevice(), m_CommandPool, 1, &commandBuffer);
+//}
 
-	VkMemoryRequirements memRequirements;
-	vkGetBufferMemoryRequirements(m_deviceManager->GetLogicalDevice(), buffer, &memRequirements);
 
-	VkMemoryAllocateInfo allocInfo{};
-	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	allocInfo.allocationSize = memRequirements.size;
-	allocInfo.memoryTypeIndex = DeviceManager::findMemoryType(memRequirements.memoryTypeBits, properties, m_deviceManager->GetPhysicalDevice());
-
-	if (vkAllocateMemory(m_deviceManager->GetLogicalDevice(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-		throw std::runtime_error("failed to allocate buffer memory!");
-	}
-
-	vkBindBufferMemory(m_deviceManager->GetLogicalDevice(), buffer, bufferMemory, 0);
-}
+//void BufferManager::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer  & buffer, VkDeviceMemory & bufferMemory)
+//{
+//
+//	VkBufferCreateInfo bufferInfo{};
+//	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+//	bufferInfo.size = size;
+//	bufferInfo.usage = usage;
+//	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+//
+//	if (vkCreateBuffer(m_deviceManager->GetLogicalDevice(), &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+//		throw std::runtime_error("failed to create buffer!");
+//	}
+//
+//	VkMemoryRequirements memRequirements;
+//	vkGetBufferMemoryRequirements(m_deviceManager->GetLogicalDevice(), buffer, &memRequirements);
+//
+//	VkMemoryAllocateInfo allocInfo{};
+//	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+//	allocInfo.allocationSize = memRequirements.size;
+//	allocInfo.memoryTypeIndex = DeviceManager::findMemoryType(memRequirements.memoryTypeBits, properties, m_deviceManager->GetPhysicalDevice());
+//
+//	if (vkAllocateMemory(m_deviceManager->GetLogicalDevice(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+//		throw std::runtime_error("failed to allocate buffer memory!");
+//	}
+//
+//	vkBindBufferMemory(m_deviceManager->GetLogicalDevice(), buffer, bufferMemory, 0);
+//}
 
 
 void BufferManager::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkCommandPool commandPool)
 {
+	VkCommandBuffer commandBuffer = beginSingleTimeCommands(m_deviceManager->GetLogicalDevice(), commandPool);
 
-	// Memory transfer operations are executed using command buffers
-	VkCommandBufferAllocateInfo allocInfo{};
-	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandPool = commandPool;
-	allocInfo.commandBufferCount = 1;
-
-	VkCommandBuffer commandBuffer;
-	vkAllocateCommandBuffers(m_deviceManager->GetLogicalDevice(), &allocInfo, &commandBuffer);
-
-	VkCommandBufferBeginInfo beginInfo{};
-	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;// // We're only going to use the command buffer once and wait with returning from the function until the copy operation has finished executing. 
-
-
-	vkBeginCommandBuffer(commandBuffer, &beginInfo);
 	VkBufferCopy copyRegion{};
 	copyRegion.size = size;
-
 	vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
 
-	//end command 
-	vkEndCommandBuffer(commandBuffer);
-
-	VkSubmitInfo submitInfo{};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &commandBuffer;
-
-	vkQueueSubmit(m_deviceManager->GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-	// wait for the transfer queue to become idle //we could use fences but to have multiple transfers simulaniosly 
-
-	vkQueueWaitIdle(m_deviceManager->GetGraphicsQueue());
-
-	vkFreeCommandBuffers(m_deviceManager->GetLogicalDevice(), commandPool, 1, &commandBuffer);
+	endSingleTimeCommands(m_deviceManager->GetLogicalDevice(), commandPool, m_deviceManager->GetGraphicsQueue(), commandBuffer);
 }
 
 void BufferManager::DestroyIndexBuffer()

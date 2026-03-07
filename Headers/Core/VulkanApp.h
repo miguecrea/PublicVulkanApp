@@ -14,6 +14,7 @@ class FramebufferManager;
 class CommandManager;
 class BufferManager;
 class DescriptorSetLayout;
+class Image;
 
 class Renderer final
 {
@@ -58,6 +59,7 @@ private:
     CommandManager * m_CommandManager;
     BufferManager * m_vertexBuffer;
     DescriptorSetLayout * m_DescriptorSetsLayout;
+    Image * m_ImageManager;
     void  setupDebugMessenger();
 };
 

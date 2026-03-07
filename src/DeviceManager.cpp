@@ -75,6 +75,7 @@ void DeviceManager::createLogicalDevice(InstanceManager * IntanceManager)
     createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
     createInfo.pEnabledFeatures = &deviceFeatures;
+    deviceFeatures.samplerAnisotropy = VK_TRUE;
     //enable swap chain extension
     createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
     createInfo.ppEnabledExtensionNames = deviceExtensions.data();
@@ -186,19 +187,21 @@ uint32_t DeviceManager::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlag
 
 bool DeviceManager::isDeviceSuitable(VkPhysicalDevice device)
 {
-    QueueFamilyIndices indices = findQueueFamilies(device);
    
+    QueueFamilyIndices indices = findQueueFamilies(device);
+
     bool extensionsSupported = checkDeviceExtensionSupport(device);
 
-    
     bool swapChainAdequate = false;
-    if (extensionsSupported)
-    {
+    if (extensionsSupported) {
         SwapChainSupportDetails swapChainSupport = SwapChain::querySwapChainSupport(device,m_Surface);
         swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
     }
 
-    return indices.isComplete() && extensionsSupported && swapChainAdequate;
+    VkPhysicalDeviceFeatures supportedFeatures;
+    vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
+
+    return indices.isComplete() && extensionsSupported && swapChainAdequate && supportedFeatures.samplerAnisotropy;
 }
 
 QueueFamilyIndices DeviceManager::findQueueFamilies(VkPhysicalDevice device)

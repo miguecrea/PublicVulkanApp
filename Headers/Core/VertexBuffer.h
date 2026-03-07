@@ -16,7 +16,9 @@ class BufferManager
 {
 private:
 
+	VkCommandPool m_CommandPool;
 	DeviceManager * m_deviceManager;
+	VkCommandBuffer m_commandBuffer;
 	//vertex buffer 
 	VkBuffer vertexBuffer;
 	VkDeviceMemory vertexBufferMemory;
@@ -39,14 +41,16 @@ private:
 
 public:
 
-	BufferManager(DeviceManager * deviceManager);
+	BufferManager(DeviceManager * deviceManager,VkCommandPool CommandPool);
 	VkBuffer GetVertexBuffer();
 	VkBuffer GetIndexBuffer();
-	void CreateVertexBuffer(VkCommandPool commandPool);
-	void CreateIndexBuffer(VkCommandPool commandPool);
+	void CreateVertexBuffer();
+	void CreateIndexBuffer();
 
 
-	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer & buffer, VkDeviceMemory& bufferMemory);
+
+
+	//void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer & buffer, VkDeviceMemory& bufferMemory);
 	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkCommandPool commandPool);
 
 

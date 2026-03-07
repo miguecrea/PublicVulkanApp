@@ -9,6 +9,7 @@
 #include"../Headers/Core/CommandManager.h"
 #include"../Headers/Core/VertexBuffer.h"
 #include"../Headers/Core/DescriptorSetLayout.h"
+#include"../Headers/Core/Image.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -22,8 +23,10 @@ Renderer::Renderer()
 	m_DeviceManager = new DeviceManager();
 	m_SwapChain = new SwapChain(m_DeviceManager);
 	m_GraphicsPipeline = new GraphicsPipeline();
-	
+
 }
+
+
 Renderer::~Renderer()
 {
 	delete m_Window;
@@ -56,6 +59,8 @@ Renderer::~Renderer()
 	delete m_DescriptorSetsLayout;
 	m_DescriptorSetsLayout = nullptr;
 
+	delete m_ImageManager;
+	m_ImageManager = nullptr;
 
 }
 void Renderer::InitWindow()
@@ -90,10 +95,18 @@ void Renderer::InitVulkan()
 	m_FrameBuffer = new FramebufferManager(m_DeviceManager->GetLogicalDevice());
 	m_FrameBuffer->CreateFramebuffers(m_RenderPass->Get(), m_SwapChain->GetSwapChainImageViews(), m_SwapChain->GetExtend());
 	m_CommandManager = new CommandManager(m_DeviceManager->GetLogicalDevice(), m_DeviceManager->GetFamilyIndices());
-	m_vertexBuffer = new BufferManager(m_DeviceManager);
 	m_CommandManager->CreateCommandPool();
-	m_vertexBuffer->CreateVertexBuffer(m_CommandManager->GetCommandPool());
-	m_vertexBuffer->CreateIndexBuffer(m_CommandManager->GetCommandPool());
+
+	m_vertexBuffer = new BufferManager(m_DeviceManager,m_CommandManager->GetCommandPool());
+
+	// TEXTURE 
+	m_ImageManager = new Image(m_DeviceManager,m_CommandManager->GetCommandPool());
+	m_ImageManager->createTextureImage();
+	m_ImageManager->createTextureImageView();
+	m_ImageManager->createTextureSampler();
+
+	m_vertexBuffer->CreateVertexBuffer();
+	m_vertexBuffer->CreateIndexBuffer();
 
 
 	m_DescriptorSetsLayout->createUniformBuffers(m_CommandManager->MAX_FRAMES_IN_FLIGHT);
@@ -325,6 +338,10 @@ void Renderer::CleanUp()
 {
 
 	CleanUpSwapChain();
+
+	m_ImageManager->DestroyTextureSampler();
+	m_ImageManager->destroyTextureImageView();
+	m_ImageManager->DestroyImage();
 	//here 
 
 	m_DescriptorSetsLayout->DestroyUniformBuffers(m_CommandManager->MAX_FRAMES_IN_FLIGHT);
