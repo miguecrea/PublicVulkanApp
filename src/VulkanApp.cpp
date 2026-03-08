@@ -24,6 +24,9 @@ Renderer::Renderer()
 	m_SwapChain = new SwapChain(m_DeviceManager);
 	m_GraphicsPipeline = new GraphicsPipeline();
 
+
+
+
 }
 
 
@@ -84,11 +87,19 @@ void Renderer::InitVulkan()
 	m_DeviceManager->SetSurface(m_Window->surface);
 	m_DeviceManager->pickPhysicalDevice(m_InstanceManager->GetVulkanInstance());
 	m_DeviceManager->createLogicalDevice(m_InstanceManager);
+
+
+
+
+
+
 	m_SwapChain->createSwapChain(m_DeviceManager->GetPhysicalDevice(),m_DeviceManager->GetLogicalDevice(), m_Window->surface, m_Window->GetWindow());
 	m_SwapChain->createImageViews(m_DeviceManager->GetLogicalDevice());
 	m_RenderPass = new RenderPass(m_DeviceManager->GetLogicalDevice(), m_SwapChain->GetSwapChainImageFormat());
 	m_RenderPass->CreateRenderPass();
 
+
+	//THIS NEEDS THE IMAGE sampler but the image needs the command pool
 	m_DescriptorSetsLayout = new DescriptorSetLayout(m_DeviceManager->GetLogicalDevice(),m_DeviceManager->GetPhysicalDevice(),m_SwapChain->GetExtend());
 	m_DescriptorSetsLayout->createDescriptorSetLayout();
 	m_GraphicsPipeline->CreateGraphicsPipeline(m_DeviceManager->GetLogicalDevice(),m_RenderPass->Get(),m_DescriptorSetsLayout->GetDescriptorSetLayout());
@@ -99,8 +110,9 @@ void Renderer::InitVulkan()
 
 	m_vertexBuffer = new BufferManager(m_DeviceManager,m_CommandManager->GetCommandPool());
 
-	// TEXTURE 
 	m_ImageManager = new Image(m_DeviceManager,m_CommandManager->GetCommandPool());
+	// TEXTURE 
+	//needs 
 	m_ImageManager->createTextureImage();
 	m_ImageManager->createTextureImageView();
 	m_ImageManager->createTextureSampler();
@@ -111,7 +123,9 @@ void Renderer::InitVulkan()
 
 	m_DescriptorSetsLayout->createUniformBuffers(m_CommandManager->MAX_FRAMES_IN_FLIGHT);
 	m_DescriptorSetsLayout->createDescriptorPool(m_CommandManager->MAX_FRAMES_IN_FLIGHT);
-	m_DescriptorSetsLayout->createDescriptorSets(m_CommandManager->MAX_FRAMES_IN_FLIGHT);
+
+	////////////////////   
+	m_DescriptorSetsLayout->createDescriptorSets(m_CommandManager->MAX_FRAMES_IN_FLIGHT, m_ImageManager->GetTextureImageView(),m_ImageManager->GetTextureSampler());
 	m_CommandManager->createCommandBuffer();
 	createSemaphoresObjects(m_DeviceManager->GetLogicalDevice()); //NO CLASSS 
 }

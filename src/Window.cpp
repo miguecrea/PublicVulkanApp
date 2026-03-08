@@ -39,7 +39,7 @@ void Window::DestroySurface(VkInstance Vulkaninstance)
     vkDestroySurfaceKHR(Vulkaninstance, surface, nullptr);
 }
 
-static void framebufferResizeCallback(GLFWwindow* window, int width, int height)
+static void framebufferResizeCallback(GLFWwindow * window, int width, int height)
 {
     auto app = reinterpret_cast<Renderer*>(glfwGetWindowUserPointer(window));
     app->framebufferResized = true;

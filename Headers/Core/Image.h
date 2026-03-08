@@ -26,11 +26,17 @@ public:
 
 	VkImageView createImageView(VkDevice device,VkImage image, VkFormat format);
 	
+
+
+	VkImageView GetTextureImageView();
+	VkSampler GetTextureSampler();
 private:
 
 	VkSampler textureSampler;
 	//image view for the texture 
 	VkImageView textureImageView;
+
+
 
 	DeviceManager * m_deviceManager;
 	VkCommandPool m_CommandPool;

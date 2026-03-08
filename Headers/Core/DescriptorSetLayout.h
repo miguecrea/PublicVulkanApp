@@ -19,14 +19,19 @@ class DescriptorSetLayout
 public:
     DescriptorSetLayout(VkDevice device, VkPhysicalDevice physicalDevice, VkExtent2D swapChainExtend);
     void createDescriptorSetLayout();
+    void DestroyDescriptorSetLayout();
+
+
+
+
+
     void  createUniformBuffers(int FramesInFlisght);
     void  DestroyUniformBuffers(int FramesInFlisght);
-    void DestroyDescriptorSetLayout();
 
     void UpdateUniformBuffers(uint32_t currentFrame);
    void  createDescriptorPool(int FramesInFlight);
    void   DestroyDescriptorPool();
-   void   createDescriptorSets(int FramesinFlight);
+   void   createDescriptorSets(int FramesinFlight, VkImageView imageView, VkSampler sampler);
 
 
    std::vector<VkDescriptorSet> GetdescriptorSets();

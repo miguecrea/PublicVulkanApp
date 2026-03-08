@@ -7,6 +7,8 @@
 #include <chrono>
 
 
+
+
 DescriptorSetLayout::DescriptorSetLayout(VkDevice device,VkPhysicalDevice physicalDevice,VkExtent2D swapChainExtend):
     m_device{device},m_PhysicalDevice{physicalDevice},m_SwapChainExtend{swapChainExtend}
 {
@@ -14,6 +16,8 @@ DescriptorSetLayout::DescriptorSetLayout(VkDevice device,VkPhysicalDevice physic
 
 void DescriptorSetLayout::createDescriptorSetLayout()
 {
+
+    //UBO 
     VkDescriptorSetLayoutBinding uboLayoutBinding{};
     // binding index 
     uboLayoutBinding.binding = 0;
@@ -22,17 +26,31 @@ void DescriptorSetLayout::createDescriptorSetLayout()
     uboLayoutBinding.pImmutableSamplers = nullptr;
     uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
+  
+
+    //IMAGE SAMPLER //we bind this to the SHADER IN THE FRAGMENT 
+    VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+    samplerLayoutBinding.binding = 1;
+    samplerLayoutBinding.descriptorCount = 1;
+    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding.pImmutableSamplers = nullptr;
+    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT; //in the fragmentr shader 
+
+    std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
+
+
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 1;
-    layoutInfo.pBindings = &uboLayoutBinding;
-
-    //this layput we need to set in in theb grpahics pipeline 
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
 
     if (vkCreateDescriptorSetLayout(m_device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor set layout!");
     }
 }
+
+
+
 
 void DescriptorSetLayout::createUniformBuffers(int FramesInFlisght)
 {
@@ -91,6 +109,8 @@ void DescriptorSetLayout::UpdateUniformBuffers(uint32_t currentFrame)
     memcpy(uniformBuffersMapped[currentFrame], &ubo, sizeof(ubo));
 }
 
+
+
 void DescriptorSetLayout::createDescriptorPool(int FramesInFlisght)
 {
 
@@ -119,7 +139,7 @@ void DescriptorSetLayout::DestroyDescriptorPool()
 
 }
 
-void DescriptorSetLayout::createDescriptorSets(int FramesinFlight)
+void DescriptorSetLayout::createDescriptorSets(int FramesinFlight, VkImageView imageView,VkSampler sampler)
 {
 
     std::vector<VkDescriptorSetLayout> layouts(FramesinFlight, descriptorSetLayout);
@@ -144,16 +164,31 @@ void DescriptorSetLayout::createDescriptorSets(int FramesinFlight)
         bufferInfo.offset = 0;
         bufferInfo.range = sizeof(UniformBufferObject);
 
-        VkWriteDescriptorSet descriptorWrite{};
-        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrite.dstSet = descriptorSets[i];
-        descriptorWrite.dstBinding = 0;
-        descriptorWrite.dstArrayElement = 0;
-        descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrite.descriptorCount = 1;
-        descriptorWrite.pBufferInfo = &bufferInfo;
+       
+        VkDescriptorImageInfo imageInfo{};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView = imageView;
+        imageInfo.sampler = sampler;
 
-        vkUpdateDescriptorSets(m_device, 1, &descriptorWrite, 0, nullptr);
+        std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+
+        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[0].dstSet = descriptorSets[i];
+        descriptorWrites[0].dstBinding = 0;
+        descriptorWrites[0].dstArrayElement = 0;
+        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[0].descriptorCount = 1;
+        descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[1].dstSet = descriptorSets[i];
+        descriptorWrites[1].dstBinding = 1;
+        descriptorWrites[1].dstArrayElement = 0;
+        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[1].descriptorCount = 1;
+        descriptorWrites[1].pImageInfo = &imageInfo;
+
+        vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
     }
 }
 

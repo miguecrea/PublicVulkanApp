@@ -8,7 +8,7 @@
 #include "stb_image.h"
 
 
-Image::Image(DeviceManager* deviceManager, VkCommandPool commandPool):
+Image::Image(DeviceManager * deviceManager, VkCommandPool commandPool):
     m_deviceManager{deviceManager},m_CommandPool{commandPool}
 {
 }
@@ -125,8 +125,20 @@ VkImageView Image::createImageView(VkDevice device,VkImage image, VkFormat forma
 
 }
 
+VkImageView Image::GetTextureImageView()
+{
+    return textureImageView;
+}
+
+VkSampler Image::GetTextureSampler()
+{
+    return textureSampler;
+}
+
 void Image::createTextureImageView()
 {
+
+    //
     textureImageView = createImageView(m_deviceManager->GetLogicalDevice(),textureImage, VK_FORMAT_R8G8B8A8_SRGB);
 }
 
@@ -145,7 +157,6 @@ void Image::createTextureSampler()
     VkSamplerCreateInfo samplerInfo{};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     samplerInfo.magFilter = VK_FILTER_LINEAR;
-    samplerInfo.minFilter = VK_FILTER_LINEAR;
     samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;  //for aaxes is repeat clamp
     samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
