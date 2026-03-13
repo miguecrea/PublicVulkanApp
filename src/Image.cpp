@@ -4,12 +4,19 @@
 #include"../Headers/Core/Helpers.h"
 #include"../Headers/Core/DeviceManager.h"
 
+//
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+//
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
 
-Image::Image(DeviceManager * deviceManager, VkCommandPool commandPool):
-    m_deviceManager{deviceManager},m_CommandPool{commandPool}
+Image::Image(DeviceManager * deviceManager):
+    m_deviceManager{deviceManager}
 {
 }
 
@@ -18,7 +25,10 @@ void Image::createTextureImage()
 
     int texWidth, texHeight, texChannels;
 
-    auto Texturepath = std::string(PROJECT_SOURCE_DIR)+ "/Textures/texture.jpg";
+
+
+    //auto Texturepath = std::string(PROJECT_SOURCE_DIR)+ "/Textures/texture.jpg";
+    auto Texturepath = std::string(PROJECT_SOURCE_DIR)+ "/Textures/viking_room.png";
 
     stbi_uc * pixels = stbi_load(Texturepath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
 
@@ -102,6 +112,37 @@ void Image::DestroyImage()
 
 
 
+
+
+
+VkImageView Image::createImageViewWithAspectFlags(VkDevice device, VkImage image, VkFormat format, VkImageAspectFlags aspectFlags)
+{
+    VkImageViewCreateInfo viewInfo{};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = image;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = format;
+    viewInfo.subresourceRange.aspectMask = aspectFlags;
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount = 1;
+
+    VkImageView imageView;
+
+    if (vkCreateImageView(device, &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create image view!");
+    }
+
+    return imageView;
+
+}
+
+
+
+
+
+// Image view for Subresoruces Color 
 VkImageView Image::createImageView(VkDevice device,VkImage image, VkFormat format)
 {
     VkImageViewCreateInfo viewInfo{};
@@ -123,6 +164,54 @@ VkImageView Image::createImageView(VkDevice device,VkImage image, VkFormat forma
 
     return imageView;
 
+}
+
+VkFormat Image::findSupportedFormat(const std::vector<VkFormat> & candidates, VkImageTiling tiling, VkFormatFeatureFlags features)
+{
+   
+    for (VkFormat format : candidates) {
+        VkFormatProperties props;
+        vkGetPhysicalDeviceFormatProperties(m_deviceManager->GetPhysicalDevice(), format, &props);
+
+        if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) {
+            return format;
+        }
+        else if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features) {
+            return format;
+        }
+    }
+
+    throw std::runtime_error("failed to find supported format!");
+}
+
+VkFormat Image::findDepthFormat()
+{
+    //find fromat witha  depth compoennt that suports usage as depth atachemnmt 
+    return findSupportedFormat(
+        { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+    );
+}
+
+
+void Image::SetCommandPool(VkCommandPool command)
+{
+    m_CommandPool = command;
+}
+
+VkImageView Image::GetDepthImageView()
+{
+    return depthImageView;
+}
+
+void Image::CreateDepthResources(VkExtent2D swapChainExtend)
+{
+
+    VkFormat depthFormat = findDepthFormat();
+
+    createImage(swapChainExtend.width, swapChainExtend.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
+    depthImageView = createImageViewWithAspectFlags(m_deviceManager->GetLogicalDevice(), depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 }
 
 VkImageView Image::GetTextureImageView()
@@ -176,6 +265,14 @@ void Image::createTextureSampler()
 void Image::DestroyTextureSampler()
 {
     vkDestroySampler(m_deviceManager->GetLogicalDevice(), textureSampler, nullptr);
+}
+
+void Image::DestroyDepthBufferingRelated()
+{
+
+    vkDestroyImageView(m_deviceManager->GetLogicalDevice(), depthImageView, nullptr);
+    vkDestroyImage(m_deviceManager->GetLogicalDevice(), depthImage, nullptr);
+    vkFreeMemory(m_deviceManager->GetLogicalDevice(), depthImageMemory, nullptr);
 }
 
 void Image::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout)

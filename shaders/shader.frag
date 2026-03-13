@@ -1,6 +1,6 @@
 #version 450
 
-//from descripto set 
+//from descriptor set 
 layout(binding = 1) uniform sampler2D texSampler;
 
 layout(location = 0) in vec3 fragColor;

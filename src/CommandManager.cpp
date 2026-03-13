@@ -3,6 +3,7 @@
 #include "../Headers/Core/DescriptorSetLayout.h"
 #include <stdexcept>
 #include <iostream>
+#include<tiny_obj_loader.h>
 
 CommandManager::CommandManager(VkDevice device, const QueueFamilyIndices & queueFamilyIndices):
 	m_Device{device},
@@ -98,9 +99,20 @@ void CommandManager::recordCommandBuffer(VkCommandBuffer commandBuffer,
 	//extend
 	renderPassInfo.renderArea.offset = { 0, 0 };
 	renderPassInfo.renderArea.extent = swapChainExtent;
-	VkClearValue clearColor = { {{0.0f, 0.0f, 0.0f, 1.0f}} };  //clear value for 
-	renderPassInfo.clearValueCount = 1;
-	renderPassInfo.pClearValues = &clearColor;
+
+
+
+	// one clear color for color atachemnt and one for depth stencil
+	std::array<VkClearValue, 2> clearValues{};
+	clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+	clearValues[1].depthStencil = { 1.0f, 0 };
+
+	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+	renderPassInfo.pClearValues = clearValues.data();
+
+
+
+
 
 	//VK_SUBPASS_CONTENTS_INLINE: The render pass commands will be embedded in the primary command buffer itself and no secondary command buffers will be executed.
      //VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: The render pass commands will be executed from secondary command buffers
@@ -130,7 +142,7 @@ void CommandManager::recordCommandBuffer(VkCommandBuffer commandBuffer,
 	VkDeviceSize offsets[] = { 0 };
 	vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-	vkCmdBindIndexBuffer(commandBuffer, vertexbuffer->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT16);
+	vkCmdBindIndexBuffer(commandBuffer, vertexbuffer->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
 //vertexCount: Even though we don't have a vertex buffer, we technically still have 3 vertices to draw.
 //instanceCount : Used for instanced rendering, use 1 if you're not doing that.

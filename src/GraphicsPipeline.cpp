@@ -136,6 +136,28 @@ void GraphicsPipeline::CreateGraphicsPipeline(VkDevice device,VkRenderPass Rende
 
 
 
+    //ENABLE depth stencil for depth buffer 
+    VkPipelineDepthStencilStateCreateInfo depthStencil{};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.stencilTestEnable = VK_FALSE;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   //  After a fragment shader has returned a color, it needs to be combined with the color that is already in the framebuffer.
   //  This transformation is known as color blending and there are two ways to do it:
 
@@ -202,6 +224,7 @@ void GraphicsPipeline::CreateGraphicsPipeline(VkDevice device,VkRenderPass Rende
     pipelineInfo.pViewportState = &viewportState;
     pipelineInfo.pRasterizationState = &rasterizer;
     pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pDepthStencilState = &depthStencil;  //add depth stencol 
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = pipelineLayout;

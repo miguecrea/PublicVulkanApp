@@ -21,10 +21,6 @@ public:
     void createDescriptorSetLayout();
     void DestroyDescriptorSetLayout();
 
-
-
-
-
     void  createUniformBuffers(int FramesInFlisght);
     void  DestroyUniformBuffers(int FramesInFlisght);
 

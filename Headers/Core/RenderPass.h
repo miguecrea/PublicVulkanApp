@@ -9,7 +9,7 @@ public:
     RenderPass(VkDevice device, VkFormat swapChainImageFormat);
     ~RenderPass() = default;
     VkRenderPass Get() const { return m_RenderPass; }
-    void CreateRenderPass();
+    void CreateRenderPass(VkPhysicalDevice physicalDevcie);
     void DestroyRenderPass();
 private:
     VkDevice m_Device;

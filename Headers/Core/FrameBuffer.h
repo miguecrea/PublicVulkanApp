@@ -11,7 +11,7 @@ public:
     void CreateFramebuffers(
         VkRenderPass renderPass,
         const std::vector<VkImageView>& swapChainImageViews,
-        VkExtent2D extent
+        VkExtent2D extent, VkImageView depthImageView
     );
 
     const std::vector<VkFramebuffer>& GetFrameBuffers();

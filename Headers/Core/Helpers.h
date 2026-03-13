@@ -11,7 +11,11 @@ VkCommandBuffer beginSingleTimeCommands(VkDevice device, VkCommandPool pool);
 void createBuffer(VkDevice device, VkPhysicalDevice physysicalDevice, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 void endSingleTimeCommands(VkDevice device, VkCommandPool pool, VkQueue queue, VkCommandBuffer cmd);
 
-inline void createBuffer(VkDevice device, VkPhysicalDevice physysicalDevice ,VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer & buffer, VkDeviceMemory & bufferMemory)
+
+
+
+inline void createBuffer(VkDevice device, VkPhysicalDevice physysicalDevice, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
+
 {
 
 	VkBufferCreateInfo bufferInfo{};
@@ -82,6 +86,38 @@ inline void endSingleTimeCommands(VkDevice device, VkCommandPool pool, VkQueue g
 }
 namespace Utils
 {
+
+
+	
+ 
+	VkFormat findSupportedFormat(VkPhysicalDevice pysyicaldevice, const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+
+	inline VkFormat findDepthFormat(VkPhysicalDevice pysyicaldevice)
+	{
+		//find fromat witha  depth compoennt that suports usage as depth atachemnmt 
+		return findSupportedFormat(pysyicaldevice,
+			{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+		);
+	}
+
+
+	inline VkFormat findSupportedFormat(VkPhysicalDevice pysyicaldevice ,const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
+		for (VkFormat format : candidates) {
+			VkFormatProperties props;
+			vkGetPhysicalDeviceFormatProperties(pysyicaldevice, format, &props);
+
+			if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) {
+				return format;
+			}
+			else if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features) {
+				return format;
+			}
+		}
+
+		throw std::runtime_error("failed to find supported format!");
+	}
 
 
 

@@ -10,6 +10,7 @@
 #include"../Headers/Core/VertexBuffer.h"
 #include"../Headers/Core/DescriptorSetLayout.h"
 #include"../Headers/Core/Image.h"
+#include"../Headers/Core/Helpers.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -96,7 +97,7 @@ void Renderer::InitVulkan()
 	m_SwapChain->createSwapChain(m_DeviceManager->GetPhysicalDevice(),m_DeviceManager->GetLogicalDevice(), m_Window->surface, m_Window->GetWindow());
 	m_SwapChain->createImageViews(m_DeviceManager->GetLogicalDevice());
 	m_RenderPass = new RenderPass(m_DeviceManager->GetLogicalDevice(), m_SwapChain->GetSwapChainImageFormat());
-	m_RenderPass->CreateRenderPass();
+	m_RenderPass->CreateRenderPass(m_DeviceManager->GetPhysicalDevice());
 
 
 	//THIS NEEDS THE IMAGE sampler but the image needs the command pool
@@ -104,19 +105,31 @@ void Renderer::InitVulkan()
 	m_DescriptorSetsLayout->createDescriptorSetLayout();
 	m_GraphicsPipeline->CreateGraphicsPipeline(m_DeviceManager->GetLogicalDevice(),m_RenderPass->Get(),m_DescriptorSetsLayout->GetDescriptorSetLayout());
 	m_FrameBuffer = new FramebufferManager(m_DeviceManager->GetLogicalDevice());
-	m_FrameBuffer->CreateFramebuffers(m_RenderPass->Get(), m_SwapChain->GetSwapChainImageViews(), m_SwapChain->GetExtend());
+
+	m_ImageManager = new Image(m_DeviceManager);
+	m_ImageManager->CreateDepthResources(m_SwapChain->GetExtend());  //before frae bugger 
+
+
+
+	m_FrameBuffer->CreateFramebuffers(m_RenderPass->Get(), m_SwapChain->GetSwapChainImageViews(), m_SwapChain->GetExtend(),m_ImageManager->GetDepthImageView());
 	m_CommandManager = new CommandManager(m_DeviceManager->GetLogicalDevice(), m_DeviceManager->GetFamilyIndices());
 	m_CommandManager->CreateCommandPool();
 
 	m_vertexBuffer = new BufferManager(m_DeviceManager,m_CommandManager->GetCommandPool());
 
-	m_ImageManager = new Image(m_DeviceManager,m_CommandManager->GetCommandPool());
+
+
+
+
+
 	// TEXTURE 
 	//needs 
+	m_ImageManager->SetCommandPool(m_CommandManager->GetCommandPool());
 	m_ImageManager->createTextureImage();
 	m_ImageManager->createTextureImageView();
 	m_ImageManager->createTextureSampler();
 
+	m_vertexBuffer->LoadModel();
 	m_vertexBuffer->CreateVertexBuffer();
 	m_vertexBuffer->CreateIndexBuffer();
 
@@ -328,25 +341,28 @@ void Renderer::RecreateSwapChain()
 		glfwWaitEvents();
 	}
 
-
-
 	vkDeviceWaitIdle(m_DeviceManager->GetLogicalDevice());
 
 	CleanUpSwapChain();
 
 	m_SwapChain->createSwapChain(m_DeviceManager->GetPhysicalDevice(), m_DeviceManager->GetLogicalDevice(), m_Window->surface, m_Window->GetWindow());
 	m_SwapChain->createImageViews(m_DeviceManager->GetLogicalDevice());
-	m_FrameBuffer->CreateFramebuffers(m_RenderPass->Get(), m_SwapChain->GetSwapChainImageViews(), m_SwapChain->GetExtend());
+	m_ImageManager->CreateDepthResources(m_SwapChain->GetExtend());  //before frae bugger 
+	m_FrameBuffer->CreateFramebuffers(m_RenderPass->Get(), m_SwapChain->GetSwapChainImageViews(), m_SwapChain->GetExtend(),m_ImageManager->GetDepthImageView());
 
 }
 
 void Renderer::CleanUpSwapChain()
 {
+
+	m_ImageManager->DestroyDepthBufferingRelated();
 	m_FrameBuffer->DestroyFrameBuffers();
 	m_SwapChain->DestroyImageViews(m_DeviceManager->GetLogicalDevice());
 	m_SwapChain->DestroySwapChain(m_DeviceManager->GetLogicalDevice());
 
 }
+
+
 
 void Renderer::CleanUp()
 {

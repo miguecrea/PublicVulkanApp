@@ -44,7 +44,6 @@ public:
 
 
 
-
 private:
     void InitWindow();
     void InitVulkan();

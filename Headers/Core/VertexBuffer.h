@@ -9,9 +9,16 @@ class DeviceManager;
 
 struct Vertex
 {
-	glm::vec2 pos;
+	glm::vec3 pos;
 	glm::vec3 color;
 	glm::vec2 texCoord;
+
+bool operator==(const Vertex& other) const {
+	return pos == other.pos && color == other.color && texCoord == other.texCoord;
+}
+
+
+
 };
 class BufferManager
 {
@@ -30,23 +37,13 @@ private:
 
 
 
-	const std::vector<Vertex> vertices =
-	{
-	{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-	{{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-	{{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-	{{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
-	};
-
-
-
-	const std::vector<uint16_t> indices = {
-		0, 1, 2, 2, 3, 0
-	};
+	std::vector<Vertex> vertices;
+	std::vector<uint32_t> indices;
 
 public:
 
 	BufferManager(DeviceManager * deviceManager,VkCommandPool CommandPool);
+	void LoadModel();
 	VkBuffer GetVertexBuffer();
 	VkBuffer GetIndexBuffer();
 	void CreateVertexBuffer();
@@ -70,7 +67,7 @@ public:
 		return vertices;
 	}
 
-	const std::vector<uint16_t> GetIndices()
+	const std::vector<uint32_t> GetIndices()
 	{
 		return indices;
 	}
@@ -90,7 +87,7 @@ public:
 
 		attributeDescriptions[0].binding = 0;
 		attributeDescriptions[0].location = 0;
-		attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+		attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
 		attributeDescriptions[0].offset = offsetof(Vertex, pos);
 
 		attributeDescriptions[1].binding = 0;

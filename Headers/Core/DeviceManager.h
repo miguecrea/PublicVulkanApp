@@ -24,6 +24,8 @@ public:
 
     static uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties, VkPhysicalDevice device);
 
+
+  
 private:
     QueueFamilyIndices m_indices;
     VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
