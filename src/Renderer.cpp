@@ -79,9 +79,9 @@ void Renderer::Init()
     CreateSyncObjects();
 
     // Camera
+
     float aspect = m_SwapChain.GetExtent().width / (float)m_SwapChain.GetExtent().height;
-    m_Camera.SetPerspective(45.0f, aspect, 0.1f, 100.0f);
-    m_Camera.LookAt({ 2.0f, 2.0f, 2.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f });
+    m_Camera.Init(m_Window.GetHandle(), 45.0f, aspect, 0.1f, 100.0f);
 }
 
 void Renderer::CreateSwapChainDependents()
@@ -120,9 +120,17 @@ void Renderer::RecreateSwapChain()
 
 void Renderer::MainLoop()
 {
+    
+    auto lastTime = std::chrono::high_resolution_clock::now();
+
     while (!m_Window.ShouldClose())
     {
+        auto now = std::chrono::high_resolution_clock::now();
+        float deltaTime = std::chrono::duration<float>(now - lastTime).count();
+        lastTime = now;
+
         m_Window.PollEvents();
+        m_Camera.Update(deltaTime);
         DrawFrame();
     }
     vkDeviceWaitIdle(m_Device.GetLogical());
