@@ -1,6 +1,5 @@
 #include "Renderer.h"
 #include <stdexcept>
-#include <iostream>
 #include <array>
 #include <chrono>
 
@@ -8,14 +7,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-Renderer::Renderer()
-    : m_Window(800, 600)
-{
-}
-
-Renderer::~Renderer()
-{
-}
+Renderer::Renderer() : m_Window(800, 600) {}
+Renderer::~Renderer() {}
 
 void Renderer::Run()
 {
@@ -26,59 +19,50 @@ void Renderer::Run()
 
 void Renderer::Init()
 {
-    // Window
     m_Window.Init();
 
-    // Vulkan core
     m_Instance.Create();
     m_Instance.SetupDebugMessenger();
     m_Window.CreateSurface(m_Instance.Get());
     m_Device.Init(&m_Instance, m_Window.GetSurface());
 
-    // Swap chain
     m_SwapChain.Create(&m_Device, m_Window.GetSurface(), m_Window.GetHandle());
     m_SwapChain.CreateImageViews();
 
-    // Commands (needed before resource uploads)
     m_CommandManager.Init(&m_Device);
     m_CommandManager.AllocateCommandBuffers();
 
-    // Render pass
     m_RenderPass.Create(&m_Device, m_SwapChain.GetFormat());
 
-    // Resources
-    std::string modelPath   = std::string(PROJECT_SOURCE_DIR) + "/Models/viking_room.obj";
+    // Load assets
+    std::string modelPath = std::string(PROJECT_SOURCE_DIR) + "/Models/viking_room.obj";
     std::string texturePath = std::string(PROJECT_SOURCE_DIR) + "/Textures/viking_room.png";
-
     Mesh mesh = ModelLoader::Load(modelPath);
-
     m_Buffer.UploadMesh(&m_Device, &m_CommandManager, mesh);
-    m_Texture.Load(&m_Device, &m_CommandManager,texturePath);
+    m_Texture.Load(&m_Device, &m_CommandManager, texturePath);
 
-    // Uniform buffers
+    // Uniform buffer
     m_UniformBuffer.Create(&m_Device, CommandManager::MAX_FRAMES_IN_FLIGHT);
 
-    // Descriptors
+    // Geometry pass descriptors
     m_Descriptors.CreateLayout(&m_Device);
     m_Descriptors.CreatePool(&m_Device, CommandManager::MAX_FRAMES_IN_FLIGHT);
-
     std::vector<VkBuffer> uboBuffers(CommandManager::MAX_FRAMES_IN_FLIGHT);
     for (int i = 0; i < CommandManager::MAX_FRAMES_IN_FLIGHT; i++)
         uboBuffers[i] = m_UniformBuffer.GetBuffer(i);
-
     m_Descriptors.CreateSets(&m_Device, CommandManager::MAX_FRAMES_IN_FLIGHT,
         uboBuffers, m_Texture.GetView(), m_Texture.GetSampler());
 
-    // Pipeline
-    m_Pipeline.Create(&m_Device, m_RenderPass.Get(), m_Descriptors.GetLayout());
+    // Lighting pass layout only (set created per swap chain in CreateSwapChainDependents)
+    m_Descriptors.CreateLightingLayout(&m_Device);
 
-    // Swap-chain dependents
+    // Pipelines
+    m_DepthPrepassPipeline.CreateDepthPrepass(&m_Device, m_RenderPass.Get(), m_Descriptors.GetLayout());
+    m_GeometryPipeline.CreateGeometry(&m_Device, m_RenderPass.Get(), m_Descriptors.GetLayout());
+    m_LightingPipeline.CreateLighting(&m_Device, m_RenderPass.Get(), m_Descriptors.GetLightingLayout());
+
     CreateSwapChainDependents();
-
-    // Sync objects
     CreateSyncObjects();
-
-    // Camera
 
     float aspect = m_SwapChain.GetExtent().width / (float)m_SwapChain.GetExtent().height;
     m_Camera.Init(m_Window.GetHandle(), 45.0f, aspect, 0.1f, 100.0f);
@@ -86,17 +70,36 @@ void Renderer::Init()
 
 void Renderer::CreateSwapChainDependents()
 {
-    m_DepthBuffer.Create(&m_Device, m_SwapChain.GetExtent());
+    VkExtent2D extent = m_SwapChain.GetExtent();
+
+    m_DepthBuffer.Create(&m_Device, extent);
+    m_GBuffer.Create(&m_Device, extent);
+
+    std::vector<VkImageView> gbufferViews(GBuffer::Count);
+    for (int i = 0; i < GBuffer::Count; i++)
+        gbufferViews[i] = m_GBuffer.GetView(i);
+
     m_FrameBuffer.Create(&m_Device, m_RenderPass.Get(),
         m_SwapChain.GetImageViews(),
         m_DepthBuffer.GetView(),
-        m_SwapChain.GetExtent());
+        gbufferViews,
+        extent);
+
+    // Lighting descriptors reference GBuffer views so recreate on resize
+    m_Descriptors.CreateLightingPool(&m_Device);
+    std::array<VkImageView, 4> gbufferArr = {
+        m_GBuffer.GetView(0), m_GBuffer.GetView(1),
+        m_GBuffer.GetView(2), m_GBuffer.GetView(3)
+    };
+    m_Descriptors.CreateLightingSet(&m_Device, gbufferArr);
 }
 
 void Renderer::DestroySwapChainDependents()
 {
-    m_DepthBuffer.Destroy();
+    m_Descriptors.DestroyLightingPool();
     m_FrameBuffer.Destroy();
+    m_GBuffer.Destroy();
+    m_DepthBuffer.Destroy();
 }
 
 void Renderer::RecreateSwapChain()
@@ -116,11 +119,13 @@ void Renderer::RecreateSwapChain()
     m_SwapChain.Create(&m_Device, m_Window.GetSurface(), m_Window.GetHandle());
     m_SwapChain.CreateImageViews();
     CreateSwapChainDependents();
+
+    float aspect = m_SwapChain.GetExtent().width / (float)m_SwapChain.GetExtent().height;
+    m_Camera.OnResize(aspect);
 }
 
 void Renderer::MainLoop()
 {
-    
     auto lastTime = std::chrono::high_resolution_clock::now();
 
     while (!m_Window.ShouldClose())
@@ -155,7 +160,7 @@ void Renderer::DrawFrame()
     vkResetCommandBuffer(cmd, 0);
     RecordCommandBuffer(cmd, imageIndex);
 
-    VkSemaphore waitSemaphores[]   = { m_ImageAvailable[m_CurrentFrame] };
+    VkSemaphore waitSemaphores[] = { m_ImageAvailable[m_CurrentFrame] };
     VkSemaphore signalSemaphores[] = { m_RenderFinished[m_CurrentFrame] };
     VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 
@@ -200,9 +205,13 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex)
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     vkBeginCommandBuffer(cmd, &beginInfo);
 
-    std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
-    clearValues[1].depthStencil = { 1.0f, 0 };
+    std::array<VkClearValue, 6> clearValues{};
+    clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} }; // swapchain color
+    clearValues[1].depthStencil = { 1.0f, 0 };                   // depth
+    clearValues[2].color = { {0.0f, 0.0f, 0.0f, 0.0f} }; // position
+    clearValues[3].color = { {0.0f, 0.0f, 0.0f, 0.0f} }; // normal
+    clearValues[4].color = { {0.0f, 0.0f, 0.0f, 0.0f} }; // albedo
+    clearValues[5].color = { {0.0f, 0.0f, 0.0f, 0.0f} }; // metallic/roughness
 
     VkRenderPassBeginInfo rpInfo{};
     rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -214,11 +223,10 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex)
     rpInfo.pClearValues = clearValues.data();
 
     vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline.Get());
 
     VkViewport viewport{};
     viewport.x = 0.0f; viewport.y = 0.0f;
-    viewport.width  = static_cast<float>(m_SwapChain.GetExtent().width);
+    viewport.width = static_cast<float>(m_SwapChain.GetExtent().width);
     viewport.height = static_cast<float>(m_SwapChain.GetExtent().height);
     viewport.minDepth = 0.0f; viewport.maxDepth = 1.0f;
     vkCmdSetViewport(cmd, 0, 1, &viewport);
@@ -226,16 +234,40 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex)
     VkRect2D scissor{ {0, 0}, m_SwapChain.GetExtent() };
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-    VkBuffer vertexBuffers[] = { m_Buffer.GetVertexBuffer() };
+    VkBuffer     vertexBuffers[] = { m_Buffer.GetVertexBuffer() };
     VkDeviceSize offsets[] = { 0 };
+
+    // --- Subpass 0: Depth Prepass ---
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_DepthPrepassPipeline.Get());
+    VkDescriptorSet geoSet = m_Descriptors.GetSet(m_CurrentFrame);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        m_DepthPrepassPipeline.GetLayout(), 0, 1, &geoSet, 0, nullptr);
     vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, offsets);
     vkCmdBindIndexBuffer(cmd, m_Buffer.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
-
-    VkDescriptorSet set = m_Descriptors.GetSet(m_CurrentFrame);
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        m_Pipeline.GetLayout(), 0, 1, &set, 0, nullptr);
-
     vkCmdDrawIndexed(cmd, m_Buffer.GetIndexCount(), 1, 0, 0, 0);
+
+
+
+
+
+    // --- Subpass 1: Geometry Pass ---
+    vkCmdNextSubpass(cmd, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_GeometryPipeline.Get());
+
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        m_GeometryPipeline.GetLayout(), 0, 1, &geoSet, 0, nullptr);
+    vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, offsets);
+    vkCmdBindIndexBuffer(cmd, m_Buffer.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(cmd, m_Buffer.GetIndexCount(), 1, 0, 0, 0);
+
+    // --- Subpass 2: Lighting Pass (fullscreen triangle) ---
+    vkCmdNextSubpass(cmd, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_LightingPipeline.Get());
+    VkDescriptorSet lightingSet = m_Descriptors.GetLightingSet();
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        m_LightingPipeline.GetLayout(), 0, 1, &lightingSet, 0, nullptr);
+    vkCmdDraw(cmd, 3, 1, 0, 0);
+
     vkCmdEndRenderPass(cmd);
 
     if (vkEndCommandBuffer(cmd) != VK_SUCCESS)
@@ -244,15 +276,10 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex)
 
 void Renderer::UpdateUniformBuffer(uint32_t frame)
 {
-    static auto startTime = std::chrono::high_resolution_clock::now();
-    auto currentTime = std::chrono::high_resolution_clock::now();
-    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-
     UniformBufferObject ubo{};
-    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.view  = m_Camera.GetView();
-    ubo.proj  = m_Camera.GetProjection();
-
+    ubo.model = glm::mat4(1.0f);
+    ubo.view = m_Camera.GetView();
+    ubo.proj = m_Camera.GetProjection();
     m_UniformBuffer.Update(frame, ubo);
 }
 
@@ -297,9 +324,15 @@ void Renderer::CleanUp()
     m_Texture.Destroy();
     m_Buffer.Destroy();
     m_UniformBuffer.Destroy(CommandManager::MAX_FRAMES_IN_FLIGHT);
+
     m_Descriptors.DestroyPool();
     m_Descriptors.DestroyLayout();
-    m_Pipeline.Destroy();
+    m_Descriptors.DestroyLightingLayout();
+
+    m_DepthPrepassPipeline.Destroy();
+    m_GeometryPipeline.Destroy();
+    m_LightingPipeline.Destroy();
+
     m_RenderPass.Destroy();
 
     DestroySyncObjects();

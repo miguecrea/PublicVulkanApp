@@ -9,6 +9,7 @@ public:
     RenderPass() = default;
     ~RenderPass() = default;
 
+    // colorFormat = swapchain format
     void Create(Device* device, VkFormat colorFormat);
     void Destroy();
 

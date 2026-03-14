@@ -1,7 +1,6 @@
 #pragma once
 #include <vulkan/vulkan.h>
 #include <vector>
-#include <memory>
 
 #include "Core/Window.h"
 #include "Core/Instance.h"
@@ -13,6 +12,7 @@
 #include "Rendering/Pipeline.h"
 #include "Rendering/Descriptors.h"
 #include "Rendering/UniformBuffer.h"
+#include "Rendering/GBuffer.h"
 #include "Resources/DepthBuffer.h"
 #include "Resources/Texture.h"
 #include "Resources/Buffer.h"
@@ -26,9 +26,6 @@ public:
     ~Renderer();
 
     void Run();
-
-    // Exposed for GLFW resize callback
-    bool FramebufferResized = false;
 
 private:
     void Init();
@@ -56,9 +53,18 @@ private:
     // Rendering
     RenderPass    m_RenderPass;
     FrameBuffer   m_FrameBuffer;
-    Pipeline      m_Pipeline;
-    Descriptors   m_Descriptors;
     UniformBuffer m_UniformBuffer;
+
+    // Pipelines (one per subpass)
+    Pipeline m_DepthPrepassPipeline;
+    Pipeline m_GeometryPipeline;
+    Pipeline m_LightingPipeline;
+
+    // Descriptors (one set per pass)
+    Descriptors m_Descriptors;
+
+    // G-Buffer
+    GBuffer m_GBuffer;
 
     // Resources
     DepthBuffer m_DepthBuffer;
