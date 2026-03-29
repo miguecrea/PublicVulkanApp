@@ -237,7 +237,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex)
     vkBeginCommandBuffer(cmd, &beginInfo);
 
     std::array<VkClearValue, 6> clearValues{};
-    clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+    clearValues[0].color = { {0.529f, 0.808f, 0.922f, 1.0f} }; // sky blue
     clearValues[1].depthStencil = { 1.0f, 0 };
     clearValues[2].color = { {0.0f, 0.0f, 0.0f, 0.0f} };
     clearValues[3].color = { {0.0f, 0.0f, 0.0f, 0.0f} };
@@ -322,6 +322,7 @@ void Renderer::UpdateUniformBuffer(uint32_t frame)
 {
   
     UniformBufferObject ubo{};
+    ubo.model = glm::scale(glm::mat4(1.0f), glm::vec3(0.008f));
     ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
     ubo.view = m_Camera.GetView();
     ubo.proj = m_Camera.GetProjection();

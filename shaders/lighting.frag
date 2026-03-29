@@ -71,10 +71,19 @@ void main()
 
 
     vec4 albedo    = subpassLoad(inAlbedo);
-    vec2 mr        = subpassLoad(inMetallicRoughness).rg;
+    if (albedo.a == 0.0)
+    {
+        outColor = vec4(0.529, 0.808, 0.922, 1.0);
+        return;
+    }
+    vec3 mr = subpassLoad(inMetallicRoughness).rgb; // change from .rg to .rgb
 
-    float metallic  = mr.r;
-    float roughness = max(mr.g, 0.04); // clamp to avoid singularities
+
+
+    float metallic  = mr.b; // glTF: B = metallic
+    float roughness = max(mr.g, 0.04); // glTF: G = roughness
+
+
 
     vec3 V = normalize(lights.camPos.xyz - worldPos);
     vec3 L = normalize(-lights.dirLightDir.xyz); // negate: dir points toward light
@@ -97,9 +106,11 @@ void main()
     vec3 kD = (vec3(1.0) - F) * (1.0 - metallic);
     vec3 diffuse = kD * albedo.rgb / PI;
 
-    float NdotL   = max(dot(N, L), 0.0);
-    vec3 radiance = lights.dirLightColor.xyz * lights.dirLightColor.w;
-    vec3 Lo       = (diffuse + specular) * radiance * NdotL;
+    
+    float NdotL     = max(dot(N, L), 0.0);
+   float illuminance = lights.dirLightColor.w; // w = lux
+   vec3 irradiance   = lights.dirLightColor.xyz * illuminance;
+   vec3 Lo = (diffuse + specular) * irradiance * NdotL;
 
     // Ambient (IBL will replace this later)
     vec3 ambient = vec3(0.03) * albedo.rgb;
@@ -109,8 +120,6 @@ void main()
     // HDR tonemapping (Reinhard) — will be replaced with proper tone mapping later
     color = color / (color + vec3(1.0));
 
-    // Gamma correction
-    color = pow(color, vec3(1.0 / 2.2));
 
     outColor = vec4(color, 1.0);
 
