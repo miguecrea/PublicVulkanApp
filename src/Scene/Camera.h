@@ -39,7 +39,7 @@ private:
     float m_Yaw = -135.0f;
     float m_Pitch = -35.0f;
 
-    float m_MoveSpeed = 3.0f;
+    float m_MoveSpeed = 1000.0f;
     float m_LookSpeed = 0.1f;
     float m_ScrollSpeed = 1.0f;
 

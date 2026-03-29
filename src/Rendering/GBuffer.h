@@ -11,7 +11,8 @@ public:
     enum Attachment { Position = 0, Normal, Albedo, MetallicRoughness, Count };
 
     // Formats — used by RenderPass and Pipeline too
-    static constexpr VkFormat Formats[Count] = {
+    static constexpr VkFormat Formats[Count] = 
+    {
         VK_FORMAT_R32G32B32A32_SFLOAT, // Position
         VK_FORMAT_R16G16B16A16_SFLOAT, // Normal
         VK_FORMAT_R8G8B8A8_UNORM,      // Albedo

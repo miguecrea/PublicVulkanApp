@@ -52,4 +52,6 @@ private:
     void CreateLogicalDevice(Instance* instance);
     bool IsDeviceSuitable(VkPhysicalDevice device);
     bool CheckExtensionSupport(VkPhysicalDevice device);
+
+
 };

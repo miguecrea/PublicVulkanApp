@@ -16,6 +16,8 @@ void Device::Destroy()
     vkDestroyDevice(m_Device, nullptr);
 }
 
+
+
 void Device::PickPhysicalDevice(VkInstance instance)
 {
     uint32_t count = 0;
@@ -134,6 +136,8 @@ QueueFamilyIndices Device::FindQueueFamilies(VkPhysicalDevice device, VkSurfaceK
     }
     return indices;
 }
+
+
 
 uint32_t Device::FindMemoryType(VkPhysicalDevice physical, uint32_t typeFilter, VkMemoryPropertyFlags properties)
 {

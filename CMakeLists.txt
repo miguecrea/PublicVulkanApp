@@ -44,6 +44,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(tinyobjloader)
 
+# tinygltf
+FetchContent_Declare(
+    tinygltf
+    GIT_REPOSITORY https://github.com/syoyo/tinygltf.git
+    GIT_TAG        v2.8.21
+)
+FetchContent_MakeAvailable(tinygltf)
+
 # -------------------------------------------------------
 # Vulkan SDK (user must have it installed)
 # -------------------------------------------------------
@@ -91,6 +99,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${Vulkan_INCLUDE_DIRS}
     ${stb_SOURCE_DIR}
     ${tinyobjloader_SOURCE_DIR}
+    ${tinygltf_SOURCE_DIR}   
 )
 
 # -------------------------------------------------------

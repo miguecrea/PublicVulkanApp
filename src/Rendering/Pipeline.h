@@ -11,10 +11,12 @@ public:
     Pipeline() = default;
     ~Pipeline() = default;
 
-    // One Create method per subpass
-    void CreateDepthPrepass(Device* device, VkRenderPass renderPass, VkDescriptorSetLayout layout);
-    void CreateGeometry(Device* device, VkRenderPass renderPass, VkDescriptorSetLayout layout);
-    void CreateLighting(Device* device, VkRenderPass renderPass, VkDescriptorSetLayout layout);
+    void CreateDepthPrepass(Device* device, VkRenderPass renderPass,
+        VkDescriptorSetLayout cameraLayout, VkDescriptorSetLayout materialLayout);
+    void CreateGeometry(Device* device, VkRenderPass renderPass,
+        VkDescriptorSetLayout cameraLayout, VkDescriptorSetLayout materialLayout);
+    void CreateLighting(Device* device, VkRenderPass renderPass,
+        VkDescriptorSetLayout lightingLayout);
 
     void Destroy();
 
@@ -28,8 +30,8 @@ private:
 
     static std::vector<char> ReadFile(const std::string& path);
     VkShaderModule CreateShaderModule(const std::vector<char>& code);
-
-    // Shared pipeline building helper
-    void BuildLayout(VkDescriptorSetLayout layout);
     VkPipelineShaderStageCreateInfo MakeStage(VkShaderStageFlagBits stage, VkShaderModule module);
+
+    void BuildLayout(VkDescriptorSetLayout cameraLayout, VkDescriptorSetLayout materialLayout);
+    void BuildLayoutSingle(VkDescriptorSetLayout layout);
 };

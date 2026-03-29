@@ -5,21 +5,28 @@
 #include <fstream>
 #include <array>
 
-// -------------------------------------------------------
-// Helpers
-// -------------------------------------------------------
 static std::string ShaderPath(const std::string& name)
 {
     return std::string(PROJECT_SOURCE_DIR) + "/ShadersOutput/" + name + ".spv";
 }
 
-void Pipeline::BuildLayout(VkDescriptorSetLayout layout)
+void Pipeline::BuildLayout(VkDescriptorSetLayout cameraLayout, VkDescriptorSetLayout materialLayout)
+{
+    std::array<VkDescriptorSetLayout, 2> layouts = { cameraLayout, materialLayout };
+    VkPipelineLayoutCreateInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    info.setLayoutCount = 2;
+    info.pSetLayouts = layouts.data();
+    if (vkCreatePipelineLayout(m_Device->GetLogical(), &info, nullptr, &m_Layout) != VK_SUCCESS)
+        throw std::runtime_error("Failed to create pipeline layout!");
+}
+
+void Pipeline::BuildLayoutSingle(VkDescriptorSetLayout layout)
 {
     VkPipelineLayoutCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     info.setLayoutCount = 1;
     info.pSetLayouts = &layout;
-
     if (vkCreatePipelineLayout(m_Device->GetLogical(), &info, nullptr, &m_Layout) != VK_SUCCESS)
         throw std::runtime_error("Failed to create pipeline layout!");
 }
@@ -34,14 +41,13 @@ VkPipelineShaderStageCreateInfo Pipeline::MakeStage(VkShaderStageFlagBits stage,
     return info;
 }
 
-// -------------------------------------------------------
-// Subpass 0 — Depth Prepass
-// -------------------------------------------------------
-void Pipeline::CreateDepthPrepass(Device* device, VkRenderPass renderPass, VkDescriptorSetLayout layout)
+void Pipeline::CreateDepthPrepass(Device* device, VkRenderPass renderPass,
+    VkDescriptorSetLayout cameraLayout, VkDescriptorSetLayout materialLayout)
 {
     m_Device = device;
-    BuildLayout(layout);
+    BuildLayout(cameraLayout, materialLayout); // <-- changed
 
+    // rest is identical to your existing CreateDepthPrepass...
     auto vertCode = ReadFile(ShaderPath("depth_prepass.vert"));
     auto vertModule = CreateShaderModule(vertCode);
     VkPipelineShaderStageCreateInfo stages[] = { MakeStage(VK_SHADER_STAGE_VERTEX_BIT, vertModule) };
@@ -76,14 +82,12 @@ void Pipeline::CreateDepthPrepass(Device* device, VkRenderPass renderPass, VkDes
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    // Depth prepass: write depth
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthStencil.depthTestEnable = VK_TRUE;
     depthStencil.depthWriteEnable = VK_TRUE;
     depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
 
-    // No color attachments in depth prepass
     VkPipelineColorBlendStateCreateInfo colorBlending{};
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.attachmentCount = 0;
@@ -108,7 +112,7 @@ void Pipeline::CreateDepthPrepass(Device* device, VkRenderPass renderPass, VkDes
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = m_Layout;
     pipelineInfo.renderPass = renderPass;
-    pipelineInfo.subpass = 0; // Depth Prepass
+    pipelineInfo.subpass = 0;
 
     if (vkCreateGraphicsPipelines(device->GetLogical(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_Pipeline) != VK_SUCCESS)
         throw std::runtime_error("Failed to create depth prepass pipeline!");
@@ -116,13 +120,11 @@ void Pipeline::CreateDepthPrepass(Device* device, VkRenderPass renderPass, VkDes
     vkDestroyShaderModule(device->GetLogical(), vertModule, nullptr);
 }
 
-// -------------------------------------------------------
-// Subpass 1 — Geometry Pass
-// -------------------------------------------------------
-void Pipeline::CreateGeometry(Device* device, VkRenderPass renderPass, VkDescriptorSetLayout layout)
+void Pipeline::CreateGeometry(Device* device, VkRenderPass renderPass,
+    VkDescriptorSetLayout cameraLayout, VkDescriptorSetLayout materialLayout)
 {
     m_Device = device;
-    BuildLayout(layout);
+    BuildLayout(cameraLayout, materialLayout); // <-- changed
 
     auto vertCode = ReadFile(ShaderPath("geometry.vert"));
     auto fragCode = ReadFile(ShaderPath("geometry.frag"));
@@ -158,19 +160,19 @@ void Pipeline::CreateGeometry(Device* device, VkRenderPass renderPass, VkDescrip
     rasterizer.lineWidth = 1.0f;
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    //for clipping geometry
+ 
 
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    // Geometry pass: depth EQUAL, no write (prepass already wrote depth)
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthStencil.depthTestEnable = VK_TRUE;
-    depthStencil.depthWriteEnable = VK_FALSE; // prepass already wrote depth
+    depthStencil.depthWriteEnable = VK_FALSE;
     depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 
-    // 4 color attachments (one per G-Buffer target), no blending
     VkPipelineColorBlendAttachmentState blendAttachment{};
     blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -204,7 +206,7 @@ void Pipeline::CreateGeometry(Device* device, VkRenderPass renderPass, VkDescrip
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = m_Layout;
     pipelineInfo.renderPass = renderPass;
-    pipelineInfo.subpass = 1; // Geometry Pass
+    pipelineInfo.subpass = 1;
 
     if (vkCreateGraphicsPipelines(device->GetLogical(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_Pipeline) != VK_SUCCESS)
         throw std::runtime_error("Failed to create geometry pipeline!");
@@ -213,14 +215,13 @@ void Pipeline::CreateGeometry(Device* device, VkRenderPass renderPass, VkDescrip
     vkDestroyShaderModule(device->GetLogical(), vertModule, nullptr);
 }
 
-// -------------------------------------------------------
-// Subpass 2 — Lighting Pass
-// -------------------------------------------------------
-void Pipeline::CreateLighting(Device* device, VkRenderPass renderPass, VkDescriptorSetLayout layout)
+void Pipeline::CreateLighting(Device* device, VkRenderPass renderPass,
+    VkDescriptorSetLayout lightingLayout)
 {
     m_Device = device;
-    BuildLayout(layout);
+    BuildLayoutSingle(lightingLayout); // <-- uses single layout
 
+    // rest is identical to your existing CreateLighting...
     auto vertCode = ReadFile(ShaderPath("lighting.vert"));
     auto fragCode = ReadFile(ShaderPath("lighting.frag"));
     auto vertModule = CreateShaderModule(vertCode);
@@ -230,7 +231,6 @@ void Pipeline::CreateLighting(Device* device, VkRenderPass renderPass, VkDescrip
         MakeStage(VK_SHADER_STAGE_FRAGMENT_BIT, fragModule)
     };
 
-    // Fullscreen triangle — no vertex input
     VkPipelineVertexInputStateCreateInfo vertexInput{};
     vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
@@ -247,13 +247,12 @@ void Pipeline::CreateLighting(Device* device, VkRenderPass renderPass, VkDescrip
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_NONE; // fullscreen triangle, no culling
+    rasterizer.cullMode = VK_CULL_MODE_NONE;
 
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    // No depth test for lighting pass
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthStencil.depthTestEnable = VK_FALSE;
@@ -289,7 +288,7 @@ void Pipeline::CreateLighting(Device* device, VkRenderPass renderPass, VkDescrip
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = m_Layout;
     pipelineInfo.renderPass = renderPass;
-    pipelineInfo.subpass = 2; // Lighting Pass
+    pipelineInfo.subpass = 2;
 
     if (vkCreateGraphicsPipelines(device->GetLogical(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_Pipeline) != VK_SUCCESS)
         throw std::runtime_error("Failed to create lighting pipeline!");
@@ -298,18 +297,12 @@ void Pipeline::CreateLighting(Device* device, VkRenderPass renderPass, VkDescrip
     vkDestroyShaderModule(device->GetLogical(), vertModule, nullptr);
 }
 
-// -------------------------------------------------------
-// Destroy
-// -------------------------------------------------------
 void Pipeline::Destroy()
 {
     vkDestroyPipeline(m_Device->GetLogical(), m_Pipeline, nullptr);
     vkDestroyPipelineLayout(m_Device->GetLogical(), m_Layout, nullptr);
 }
 
-// -------------------------------------------------------
-// Utilities
-// -------------------------------------------------------
 std::vector<char> Pipeline::ReadFile(const std::string& path)
 {
     std::ifstream file(path, std::ios::ate | std::ios::binary);
@@ -333,5 +326,3 @@ VkShaderModule Pipeline::CreateShaderModule(const std::vector<char>& code)
         throw std::runtime_error("Failed to create shader module!");
     return module;
 }
-
-

@@ -67,7 +67,7 @@ void Camera::ProcessMouse()
     if (glfwGetInputMode(m_Window, GLFW_CURSOR) != GLFW_CURSOR_DISABLED)
         return;
 
-    m_Yaw += m_MouseDeltaX * m_LookSpeed;
+    m_Yaw -= m_MouseDeltaX * m_LookSpeed;
     m_Pitch -= m_MouseDeltaY * m_LookSpeed;
     m_Pitch = std::clamp(m_Pitch, -89.0f, 89.0f);
 

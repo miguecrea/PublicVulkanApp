@@ -5,23 +5,113 @@ layout(input_attachment_index = 1, binding = 1) uniform subpassInput inNormal;
 layout(input_attachment_index = 2, binding = 2) uniform subpassInput inAlbedo;
 layout(input_attachment_index = 3, binding = 3) uniform subpassInput inMetallicRoughness;
 
+
+layout(binding = 4) uniform LightUBO {
+    vec4 dirLightDir;
+    vec4 dirLightColor;
+    vec4 camPos;
+} lights;
+
 layout(location = 0) out vec4 outColor;
 
-const vec3  LIGHT_DIR   = normalize(vec3(1.0, -1.0, 1.0));
-const vec3  LIGHT_COLOR = vec3(0.0, 0.0,1.0);
-const float AMBIENT     = 1.5;
+const float PI = 3.14159265359;
 
+// -------------------------------------------------------
+// Cook-Torrance BRDF functions
+// -------------------------------------------------------
+
+// Normal Distribution Function — GGX/Trowbridge-Reitz
+float D_GGX(vec3 N, vec3 H, float roughness)
+{
+    float a  = roughness * roughness;
+    float a2 = a * a;
+    float NdotH  = max(dot(N, H), 0.0);
+
+    float NdotH2 = NdotH * NdotH;
+    float denom  = NdotH2 * (a2 - 1.0) + 1.0;
+    return a2 / (PI * denom * denom);
+}
+
+// Geometry Function — Smith with Schlick-GGX
+float G_SchlickGGX(float NdotV, float roughness)
+{
+    float r = roughness + 1.0;
+    float k = (r * r) / 8.0;
+    return NdotV / (NdotV * (1.0 - k) + k);
+}
+
+float G_Smith(vec3 N, vec3 V, vec3 L, float roughness)
+{
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    NdotL = clamp(NdotL, 0.0, 1.0);
+
+    return G_SchlickGGX(NdotV, roughness) * G_SchlickGGX(NdotL, roughness);
+}
+
+// Fresnel — Schlick approximation
+vec3 F_Schlick(float cosTheta, vec3 F0)
+{
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+// -------------------------------------------------------
 void main()
 {
-    vec3 worldPos = subpassLoad(inPosition).rgb;
-    vec3 normal   = normalize(subpassLoad(inNormal).rgb);
-    vec4 albedo   = subpassLoad(inAlbedo);
+    // Read G-Buffer
+    vec3 worldPos  = subpassLoad(inPosition).rgb;
+    vec3 N         = normalize(subpassLoad(inNormal).rgb * 2.0 - 1.0); // decode from [0,1]
 
-    float NdotL  = max(dot(normal, LIGHT_DIR), 0.0);
-    vec3 diffuse = LIGHT_COLOR * NdotL;
-    vec3 ambient = vec3(AMBIENT);
-    vec3 color   = albedo.rgb * (ambient + diffuse);
+    if (length(N) < 0.1) 
+{
+    outColor = vec4(0.0, 0.0, 0.0, 1.0);
+    return;
+}
 
+
+
+    vec4 albedo    = subpassLoad(inAlbedo);
+    vec2 mr        = subpassLoad(inMetallicRoughness).rg;
+
+    float metallic  = mr.r;
+    float roughness = max(mr.g, 0.04); // clamp to avoid singularities
+
+    vec3 V = normalize(lights.camPos.xyz - worldPos);
+    vec3 L = normalize(-lights.dirLightDir.xyz); // negate: dir points toward light
+    vec3 H = normalize(V + L);
+
+    // F0 = base reflectivity
+    // non-metals: 0.04, metals: albedo color
+    vec3 F0 = mix(vec3(0.04), albedo.rgb, metallic);
+
+    // Cook-Torrance specular BRDF
+    float D   = D_GGX(N, H, roughness);
+    float G   = G_Smith(N, V, L, roughness);
+    vec3  F   = F_Schlick(max(dot(H, V), 0.0), F0);
+
+    vec3 numerator   = D * G * F;
+    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+    vec3 specular    = numerator / denominator;
+
+    // Diffuse — metals have no diffuse
+    vec3 kD = (vec3(1.0) - F) * (1.0 - metallic);
+    vec3 diffuse = kD * albedo.rgb / PI;
+
+    float NdotL   = max(dot(N, L), 0.0);
+    vec3 radiance = lights.dirLightColor.xyz * lights.dirLightColor.w;
+    vec3 Lo       = (diffuse + specular) * radiance * NdotL;
+
+    // Ambient (IBL will replace this later)
+    vec3 ambient = vec3(0.03) * albedo.rgb;
+
+    vec3 color = ambient + Lo;
+
+    // HDR tonemapping (Reinhard) — will be replaced with proper tone mapping later
+    color = color / (color + vec3(1.0));
+
+    // Gamma correction
+    color = pow(color, vec3(1.0 / 2.2));
 
     outColor = vec4(color, 1.0);
+
 }

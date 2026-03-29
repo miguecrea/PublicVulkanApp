@@ -18,6 +18,9 @@
 #include "Resources/Buffer.h"
 #include "Resources/ModelLoader.h"
 #include "Scene/Camera.h"
+#include "Resources/GltfLoader.h"
+#include "Resources/Material.h"
+
 
 class Renderer
 {
@@ -70,6 +73,16 @@ private:
     DepthBuffer m_DepthBuffer;
     Texture     m_Texture;
     Buffer      m_Buffer;
+
+
+
+    GltfScene              m_Scene;
+    std::vector<Buffer>    m_Meshes;    // one per GltfMesh
+    Texture                m_FallbackTexture; // white 1x1 for missing textures
+
+
+
+
 
     // Scene
     Camera m_Camera;

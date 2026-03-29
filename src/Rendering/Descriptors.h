@@ -11,38 +11,60 @@ public:
     Descriptors() = default;
     ~Descriptors() = default;
 
-    // --- Geometry pass (UBO + albedo texture) ---
-    void CreateLayout(Device* device);
-    void CreatePool(Device* device, int framesInFlight);
-    void CreateSets(Device* device, int framesInFlight,
-        const std::vector<VkBuffer>& uniformBuffers,
-        VkImageView textureView, VkSampler sampler);
-    void DestroyLayout();
-    void DestroyPool();
+    // --- Set 0: per-frame camera UBO ---
+    void CreateCameraLayout(Device* device);
+    void CreateCameraPool(Device* device, int framesInFlight);
+    void CreateCameraSets(Device* device, int framesInFlight,
+        const std::vector<VkBuffer>& cameraBuffers);
+    void DestroyCameraLayout();
+    void DestroyCameraPool();
 
-    VkDescriptorSetLayout GetLayout()    const { return m_Layout; }
-    VkDescriptorSet       GetSet(int frame) const { return m_Sets[frame]; }
+    VkDescriptorSetLayout GetCameraLayout()      const { return m_CameraLayout; }
+    VkDescriptorSet       GetCameraSet(int frame) const { return m_CameraSets[frame]; }
 
-    // --- Lighting pass (4 input attachments) ---
+    // --- Set 1: per-material (albedo, normal, material UBO) ---
+    void CreateMaterialLayout(Device* device);
+    void CreateMaterialPool(Device* device, int materialCount);
+    void CreateMaterialSets(Device* device, int materialCount,
+        const std::vector<VkBuffer>& materialUBOs,
+        const std::vector<VkImageView>& albedoViews,
+        const std::vector<VkSampler>& albedoSamplers,
+        const std::vector<VkImageView>& normalViews,
+        const std::vector<VkSampler>& normalSamplers,
+        VkImageView fallbackView, VkSampler fallbackSampler);
+    void DestroyMaterialLayout();
+    void DestroyMaterialPool();
+
+    VkDescriptorSetLayout GetMaterialLayout()         const { return m_MaterialLayout; }
+    VkDescriptorSet       GetMaterialSet(int material) const { return m_MaterialSets[material]; }
+
+    // --- Lighting pass (4 input attachments + light UBO) ---
     void CreateLightingLayout(Device* device);
     void CreateLightingPool(Device* device);
-    void CreateLightingSet(Device* device, const std::array<VkImageView, 4>& gbufferViews);
-    void DestroyLightingPool();
+    void CreateLightingSet(Device* device,
+        const std::array<VkImageView, 4>& gbufferViews,
+        const std::vector<VkBuffer>& lightBuffers, int framesInFlight);
     void DestroyLightingLayout();
+    void DestroyLightingPool();
 
-    VkDescriptorSetLayout GetLightingLayout() const { return m_LightingLayout; }
-    VkDescriptorSet       GetLightingSet()    const { return m_LightingSet; }
+    VkDescriptorSetLayout GetLightingLayout()         const { return m_LightingLayout; }
+    VkDescriptorSet       GetLightingSet(int frame)    const { return m_LightingSets[frame]; }
 
 private:
     Device* m_Device = nullptr;
 
-    // Geometry
-    VkDescriptorSetLayout        m_Layout = VK_NULL_HANDLE;
-    VkDescriptorPool             m_Pool = VK_NULL_HANDLE;
-    std::vector<VkDescriptorSet> m_Sets;
+    // Camera
+    VkDescriptorSetLayout        m_CameraLayout = VK_NULL_HANDLE;
+    VkDescriptorPool             m_CameraPool = VK_NULL_HANDLE;
+    std::vector<VkDescriptorSet> m_CameraSets;
+
+    // Material
+    VkDescriptorSetLayout        m_MaterialLayout = VK_NULL_HANDLE;
+    VkDescriptorPool             m_MaterialPool = VK_NULL_HANDLE;
+    std::vector<VkDescriptorSet> m_MaterialSets;
 
     // Lighting
-    VkDescriptorSetLayout m_LightingLayout = VK_NULL_HANDLE;
-    VkDescriptorPool      m_LightingPool = VK_NULL_HANDLE;
-    VkDescriptorSet       m_LightingSet = VK_NULL_HANDLE;
+    VkDescriptorSetLayout        m_LightingLayout = VK_NULL_HANDLE;
+    VkDescriptorPool             m_LightingPool = VK_NULL_HANDLE;
+    std::vector<VkDescriptorSet> m_LightingSets;
 };
