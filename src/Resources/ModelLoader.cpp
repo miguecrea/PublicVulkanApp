@@ -15,7 +15,7 @@ Mesh ModelLoader::Load(const std::string& path)
     std::vector<tinyobj::material_t> materials;
     std::string warn, err;
 
-    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, path.c_str()))
+    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, path.c_str()))
         throw std::runtime_error(warn + err);
 
     Mesh mesh;

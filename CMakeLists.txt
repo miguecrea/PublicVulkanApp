@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(VulkanRenderer)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # -------------------------------------------------------
@@ -40,7 +40,7 @@ FetchContent_MakeAvailable(stb)
 FetchContent_Declare(
     tinyobjloader
     GIT_REPOSITORY https://github.com/tinyobjloader/tinyobjloader.git
-    GIT_TAG        release
+    GIT_TAG        v1.0.6
 )
 FetchContent_MakeAvailable(tinyobjloader)
 
@@ -51,6 +51,7 @@ FetchContent_Declare(
     GIT_TAG        v2.8.21
 )
 FetchContent_MakeAvailable(tinygltf)
+
 
 # -------------------------------------------------------
 # Vulkan SDK (user must have it installed)
