@@ -323,3 +323,107 @@ void Descriptors::DestroyLightingPool()
     vkDestroyDescriptorPool(m_Device->GetLogical(), m_LightingPool, nullptr);
     m_LightingSets.clear();
 }
+
+void Descriptors::CreateToneMappingLayout(Device* device)
+{
+
+    m_Device = device;
+
+    // binding 0: HDR input attachment
+    // binding 1: light UBO (for exposure settings)
+    std::array<VkDescriptorSetLayoutBinding, 2> bindings{};
+
+    bindings[0].binding = 0;
+    bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+    bindings[0].descriptorCount = 1;
+    bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    bindings[1].binding = 1;
+    bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    bindings[1].descriptorCount = 1;
+    bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    VkDescriptorSetLayoutCreateInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    info.bindingCount = 2;
+    info.pBindings = bindings.data();
+
+    if (vkCreateDescriptorSetLayout(device->GetLogical(), &info, nullptr, &m_ToneMappingLayout) != VK_SUCCESS)
+        throw std::runtime_error("Failed to create tone mapping descriptor layout!");
+}
+
+void Descriptors::CreateToneMappingPool(Device* device)
+{
+
+    std::array<VkDescriptorPoolSize, 2> sizes{};
+    sizes[0].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+    sizes[0].descriptorCount = 2;
+    sizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    sizes[1].descriptorCount = 2;
+
+    VkDescriptorPoolCreateInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    info.poolSizeCount = 2;
+    info.pPoolSizes = sizes.data();
+    info.maxSets = 2;
+
+    if (vkCreateDescriptorPool(device->GetLogical(), &info, nullptr, &m_ToneMappingPool) != VK_SUCCESS)
+        throw std::runtime_error("Failed to create tone mapping descriptor pool!");
+}
+
+void Descriptors::CreateToneMappingSet(Device* device, VkImageView hdrView,
+    const std::vector<VkBuffer>& lightBuffers, int framesInFlight)
+{
+    std::vector<VkDescriptorSetLayout> layouts(framesInFlight, m_ToneMappingLayout);
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = m_ToneMappingPool;
+    allocInfo.descriptorSetCount = framesInFlight;
+    allocInfo.pSetLayouts = layouts.data();
+
+    m_ToneMappingSets.resize(framesInFlight);
+    if (vkAllocateDescriptorSets(device->GetLogical(), &allocInfo, m_ToneMappingSets.data()) != VK_SUCCESS)
+        throw std::runtime_error("Failed to allocate tone mapping descriptor sets!");
+
+    for (int f = 0; f < framesInFlight; f++)
+    {
+        VkDescriptorImageInfo hdrInfo{};
+        hdrInfo.imageView = hdrView;
+        hdrInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        VkDescriptorBufferInfo lightInfo{};
+        lightInfo.buffer = lightBuffers[f];
+        lightInfo.offset = 0;
+        lightInfo.range = sizeof(LightUBO);
+
+        std::array<VkWriteDescriptorSet, 2> writes{};
+
+        writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[0].dstSet = m_ToneMappingSets[f];
+        writes[0].dstBinding = 0;
+        writes[0].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+        writes[0].descriptorCount = 1;
+        writes[0].pImageInfo = &hdrInfo;
+
+        writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[1].dstSet = m_ToneMappingSets[f];
+        writes[1].dstBinding = 1;
+        writes[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        writes[1].descriptorCount = 1;
+        writes[1].pBufferInfo = &lightInfo;
+
+        vkUpdateDescriptorSets(device->GetLogical(), 2, writes.data(), 0, nullptr);
+    }
+}
+
+
+void Descriptors::DestroyToneMappingLayout()
+{
+    vkDestroyDescriptorSetLayout(m_Device->GetLogical(), m_ToneMappingLayout, nullptr);
+}
+
+void Descriptors::DestroyToneMappingPool()
+{
+    vkDestroyDescriptorPool(m_Device->GetLogical(), m_ToneMappingPool, nullptr);
+    m_ToneMappingSets.clear();
+}

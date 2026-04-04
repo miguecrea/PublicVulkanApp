@@ -21,7 +21,7 @@ public:
     static void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 
 private:
-    static Camera* s_Instance;
+    static Camera *  s_Instance;
 
     GLFWwindow* m_Window = nullptr;
 
@@ -39,7 +39,7 @@ private:
     float m_Yaw = 180.0f; // was 0.0f
     float m_Pitch = 0.f;
 
-    float m_MoveSpeed = 1000.0f;
+    float m_MoveSpeed = 20.0f;
     float m_LookSpeed = 0.1f;
     float m_ScrollSpeed = 1.0f;
 

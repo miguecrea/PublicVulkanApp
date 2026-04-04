@@ -10,7 +10,12 @@ layout(binding = 4) uniform LightUBO {
     vec4 dirLightDir;
     vec4 dirLightColor;
     vec4 camPos;
+    float aperture;
+    float shutterSpeed;
+    float iso;
+    float padding;
 } lights;
+
 
 layout(location = 0) out vec4 outColor;
 
@@ -116,10 +121,6 @@ void main()
     vec3 ambient = vec3(0.03) * albedo.rgb;
 
     vec3 color = ambient + Lo;
-
-    // HDR tonemapping (Reinhard) — will be replaced with proper tone mapping later
-    color = color / (color + vec3(1.0));
-
 
     outColor = vec4(color, 1.0);
 

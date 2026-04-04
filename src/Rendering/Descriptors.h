@@ -50,7 +50,26 @@ public:
     VkDescriptorSetLayout GetLightingLayout()         const { return m_LightingLayout; }
     VkDescriptorSet       GetLightingSet(int frame)    const { return m_LightingSets[frame]; }
 
+    // Tone mapping (reads HDR image)
+    void CreateToneMappingLayout(Device* device);
+    void CreateToneMappingPool(Device* device);
+    void CreateToneMappingSet(Device* device, VkImageView hdrView,
+        const std::vector<VkBuffer>& lightBuffers, int framesInFlight);
+    void DestroyToneMappingLayout();
+    void DestroyToneMappingPool();
+
+    VkDescriptorSetLayout GetToneMappingLayout()         const { return m_ToneMappingLayout; }
+    VkDescriptorSet       GetToneMappingSet(int frame)    const { return m_ToneMappingSets[frame]; }
+
 private:
+
+
+    // TONE mapping 
+    VkDescriptorSetLayout        m_ToneMappingLayout = VK_NULL_HANDLE;
+    VkDescriptorPool             m_ToneMappingPool = VK_NULL_HANDLE;
+    std::vector<VkDescriptorSet> m_ToneMappingSets;
+
+
     Device* m_Device = nullptr;
 
     // Camera

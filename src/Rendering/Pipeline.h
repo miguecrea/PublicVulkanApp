@@ -23,6 +23,10 @@ public:
     VkPipeline       Get()       const { return m_Pipeline; }
     VkPipelineLayout GetLayout() const { return m_Layout; }
 
+
+    void CreateToneMapping(Device * device, VkRenderPass renderPass,
+        VkDescriptorSetLayout toneMappingLayout);
+
 private:
     Device* m_Device = nullptr;
     VkPipeline       m_Pipeline = VK_NULL_HANDLE;

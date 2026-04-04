@@ -18,14 +18,21 @@ struct MaterialUBO
     alignas(4)  float metallicFactor;
     alignas(4)  float roughnessFactor;
     alignas(4)  float hasNormalMap;
-    alignas(4)  float padding;
+    alignas(4)  float alphaMask;    // add
+    alignas(4)  float alphaCutoff;  // add
+    alignas(4)  float padding[2];   // keep 16 byte alignment
 };
+
 
 struct LightUBO
 {
-    alignas(16) glm::vec4 dirLightDir;    // xyz = direction (world space)
-    alignas(16) glm::vec4 dirLightColor;  // xyz = color, w = intensity
-    alignas(16) glm::vec4 camPos;         // xyz = camera world position
+    alignas(16) glm::vec4 dirLightDir;
+    alignas(16) glm::vec4 dirLightColor;
+    alignas(16) glm::vec4 camPos;
+    alignas(4)  float aperture = 16.0f;  // f-stops
+    alignas(4)  float shutterSpeed = 1.0f / 125.0f; // seconds
+    alignas(4)  float iso = 100.0f;
+    alignas(4)  float padding;
 };
 
 class UniformBuffer

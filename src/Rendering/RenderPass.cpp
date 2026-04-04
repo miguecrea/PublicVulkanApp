@@ -1,19 +1,9 @@
 #include "RenderPass.h"
 #include "GBuffer.h"
+#include "HDRBuffer.h"
 #include "../Core/Device.h"
 #include <stdexcept>
 #include <array>
-
-
-
-
-// Attachment indices (must match framebuffer attachment order)
-// 0: Swapchain color
-// 1: Depth
-// 2: Position (G-Buffer)
-// 3: Normal   (G-Buffer)
-// 4: Albedo   (G-Buffer)
-// 5: MetallicRoughness (G-Buffer)
 
 void RenderPass::Create(Device* device, VkFormat colorFormat)
 {
@@ -21,11 +11,11 @@ void RenderPass::Create(Device* device, VkFormat colorFormat)
     VkFormat depthFormat = FindDepthFormat();
 
     // -------------------------------------------------------
-    // Attachment descriptions
+    // 7 attachments
     // -------------------------------------------------------
-    std::array<VkAttachmentDescription, 6> attachments{};
+    std::array<VkAttachmentDescription, 7> attachments{};
 
-    // 0 - Swapchain color (final output)
+    // 0 - Swapchain
     attachments[0].format = colorFormat;
     attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
     attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -35,7 +25,7 @@ void RenderPass::Create(Device* device, VkFormat colorFormat)
     attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-    // 1 - Depth (written in prepass, read in geometry pass)
+    // 1 - Depth
     attachments[1].format = depthFormat;
     attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
     attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -45,7 +35,7 @@ void RenderPass::Create(Device* device, VkFormat colorFormat)
     attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-    // 2-5: G-Buffer attachments (written in geometry, read as input in lighting)
+    // 2-5 - GBuffer
     for (int i = 0; i < GBuffer::Count; i++)
     {
         attachments[2 + i].format = GBuffer::Formats[i];
@@ -57,6 +47,16 @@ void RenderPass::Create(Device* device, VkFormat colorFormat)
         attachments[2 + i].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         attachments[2 + i].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     }
+
+    // 6 - HDR image
+    attachments[6].format = HDRBuffer::Format;
+    attachments[6].samples = VK_SAMPLE_COUNT_1_BIT;
+    attachments[6].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachments[6].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachments[6].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachments[6].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachments[6].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachments[6].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     // -------------------------------------------------------
     // Subpass 0 — Depth Prepass
@@ -71,7 +71,7 @@ void RenderPass::Create(Device* device, VkFormat colorFormat)
     subpass0.pDepthStencilAttachment = &depthWriteRef;
 
     // -------------------------------------------------------
-    // Subpass 1 — Geometry Pass (fill G-Buffer)
+    // Subpass 1 — Geometry Pass
     // -------------------------------------------------------
     std::array<VkAttachmentReference, 4> gbufferColorRefs{};
     for (int i = 0; i < 4; i++)
@@ -91,32 +91,50 @@ void RenderPass::Create(Device* device, VkFormat colorFormat)
     subpass1.pDepthStencilAttachment = &depthReadRef;
 
     // -------------------------------------------------------
-    // Subpass 2 — Lighting Pass (read G-Buffer, write final color)
+    // Subpass 2 — Lighting Pass (writes to HDR image)
     // -------------------------------------------------------
-    VkAttachmentReference finalColorRef{};
-    finalColorRef.attachment = 0;
-    finalColorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    VkAttachmentReference hdrColorRef{};
+    hdrColorRef.attachment = 6;
+    hdrColorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-    std::array<VkAttachmentReference, 4> inputRefs{};
+    std::array<VkAttachmentReference, 4> gbufferInputRefs{};
     for (int i = 0; i < 4; i++)
     {
-        inputRefs[i].attachment = 2 + i;
-        inputRefs[i].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        gbufferInputRefs[i].attachment = 2 + i;
+        gbufferInputRefs[i].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     }
 
     VkSubpassDescription subpass2{};
     subpass2.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass2.colorAttachmentCount = 1;
-    subpass2.pColorAttachments = &finalColorRef;
+    subpass2.pColorAttachments = &hdrColorRef;
     subpass2.inputAttachmentCount = 4;
-    subpass2.pInputAttachments = inputRefs.data();
+    subpass2.pInputAttachments = gbufferInputRefs.data();
 
     // -------------------------------------------------------
-    // Subpass dependencies
+    // Subpass 3 — Tone Mapping (reads HDR, writes to swapchain)
     // -------------------------------------------------------
-    std::array<VkSubpassDependency, 4> deps{};
+    VkAttachmentReference swapchainColorRef{};
+    swapchainColorRef.attachment = 0;
+    swapchainColorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-    // External -> Subpass 0 (depth clear + write)
+    VkAttachmentReference hdrInputRef{};
+    hdrInputRef.attachment = 6;
+    hdrInputRef.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkSubpassDescription subpass3{};
+    subpass3.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass3.colorAttachmentCount = 1;
+    subpass3.pColorAttachments = &swapchainColorRef;
+    subpass3.inputAttachmentCount = 1;
+    subpass3.pInputAttachments = &hdrInputRef;
+
+    // -------------------------------------------------------
+    // Dependencies
+    // -------------------------------------------------------
+    std::array<VkSubpassDependency, 5> deps{};
+
+    // External -> Subpass 0
     deps[0].srcSubpass = VK_SUBPASS_EXTERNAL;
     deps[0].dstSubpass = 0;
     deps[0].srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
@@ -124,7 +142,7 @@ void RenderPass::Create(Device* device, VkFormat colorFormat)
     deps[0].srcAccessMask = 0;
     deps[0].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-    // Subpass 0 -> Subpass 1 (depth write -> depth read EQUAL)
+    // Subpass 0 -> Subpass 1
     deps[1].srcSubpass = 0;
     deps[1].dstSubpass = 1;
     deps[1].srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
@@ -132,7 +150,7 @@ void RenderPass::Create(Device* device, VkFormat colorFormat)
     deps[1].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
     deps[1].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
 
-    // Subpass 1 -> Subpass 2 (G-Buffer write -> input attachment read)
+    // Subpass 1 -> Subpass 2 (GBuffer write -> lighting read)
     deps[2].srcSubpass = 1;
     deps[2].dstSubpass = 2;
     deps[2].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -140,18 +158,26 @@ void RenderPass::Create(Device* device, VkFormat colorFormat)
     deps[2].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     deps[2].dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
 
-    // Subpass 2 -> External (final color -> present)
+    // Subpass 2 -> Subpass 3 (HDR write -> tone mapping read)
     deps[3].srcSubpass = 2;
-    deps[3].dstSubpass = VK_SUBPASS_EXTERNAL;
+    deps[3].dstSubpass = 3;
     deps[3].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    deps[3].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    deps[3].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     deps[3].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    deps[3].dstAccessMask = 0;
+    deps[3].dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+
+    // Subpass 3 -> External
+    deps[4].srcSubpass = 3;
+    deps[4].dstSubpass = VK_SUBPASS_EXTERNAL;
+    deps[4].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    deps[4].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    deps[4].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    deps[4].dstAccessMask = 0;
 
     // -------------------------------------------------------
-    // Create render pass
+    // Create
     // -------------------------------------------------------
-    std::array<VkSubpassDescription, 3> subpasses = { subpass0, subpass1, subpass2 };
+    std::array<VkSubpassDescription, 4> subpasses = { subpass0, subpass1, subpass2, subpass3 };
 
     VkRenderPassCreateInfo rpInfo{};
     rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;

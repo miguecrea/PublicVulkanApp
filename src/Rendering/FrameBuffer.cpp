@@ -3,10 +3,12 @@
 #include <stdexcept>
 #include <array>
 
+
 void FrameBuffer::Create(Device* device, VkRenderPass renderPass,
     const std::vector<VkImageView>& swapchainViews,
     VkImageView depthView,
     const std::vector<VkImageView>& gbufferViews,
+    VkImageView hdrView,
     VkExtent2D extent)
 {
     m_Device = device;
@@ -14,15 +16,14 @@ void FrameBuffer::Create(Device* device, VkRenderPass renderPass,
 
     for (size_t i = 0; i < swapchainViews.size(); i++)
     {
-        // Attachment order must match render pass:
-        // 0: swapchain color, 1: depth, 2-5: G-Buffer
-        std::array<VkImageView, 6> attachments = {
-            swapchainViews[i],   // 0 - swapchain
-            depthView,           // 1 - depth
-            gbufferViews[0],     // 2 - Position
-            gbufferViews[1],     // 3 - Normal
-            gbufferViews[2],     // 4 - Albedo
-            gbufferViews[3],     // 5 - MetallicRoughness
+        std::array<VkImageView, 7> attachments = {
+            swapchainViews[i],  // 0 - swapchain
+            depthView,          // 1 - depth
+            gbufferViews[0],    // 2 - position
+            gbufferViews[1],    // 3 - normal
+            gbufferViews[2],    // 4 - albedo
+            gbufferViews[3],    // 5 - metallic/roughness
+            hdrView,            // 6 - HDR
         };
 
         VkFramebufferCreateInfo fbInfo{};
@@ -38,7 +39,6 @@ void FrameBuffer::Create(Device* device, VkRenderPass renderPass,
             throw std::runtime_error("Failed to create framebuffer!");
     }
 }
-
 void FrameBuffer::Destroy()
 {
     for (auto fb : m_Framebuffers)

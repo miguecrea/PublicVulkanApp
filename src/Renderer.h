@@ -20,6 +20,8 @@
 #include "Scene/Camera.h"
 #include "Resources/GltfLoader.h"
 #include "Resources/Material.h"
+#include "Rendering/HDRBuffer.h"
+
 
 
 class Renderer
@@ -76,11 +78,16 @@ private:
 
 
 
+
+    //MESH and scene 
     GltfScene              m_Scene;
     std::vector<Buffer>    m_Meshes;    // one per GltfMesh
     Texture                m_FallbackTexture; // white 1x1 for missing textures
 
 
+    //HDR
+    HDRBuffer m_HDRBuffer;
+    Pipeline  m_ToneMappingPipeline;
 
 
 

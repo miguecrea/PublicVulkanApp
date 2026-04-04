@@ -97,18 +97,25 @@ void Renderer::Init()
     m_LightingPipeline.CreateLighting(&m_Device, m_RenderPass.Get(),
         m_Descriptors.GetLightingLayout());
 
+    //tone mapping pipeline 
+    m_Descriptors.CreateToneMappingLayout(&m_Device);
+    m_ToneMappingPipeline.CreateToneMapping(&m_Device, m_RenderPass.Get(),
+        m_Descriptors.GetToneMappingLayout());
+
     CreateSwapChainDependents();
     CreateSyncObjects();
 
     float aspect = m_SwapChain.GetExtent().width / (float)m_SwapChain.GetExtent().height;
-    m_Camera.Init(m_Window.GetHandle(), 45.0f, aspect, 1.0f, 5000.0f);
+    m_Camera.Init(m_Window.GetHandle(), 45.0f, aspect, 0.1f, 5000.0f);
 }
 
 void Renderer::CreateSwapChainDependents()
 {
     VkExtent2D extent = m_SwapChain.GetExtent();
+
     m_DepthBuffer.Create(&m_Device, extent);
     m_GBuffer.Create(&m_Device, extent);
+    m_HDRBuffer.Create(&m_Device, extent);
 
     std::vector<VkImageView> gbufferViews(GBuffer::Count);
     for (int i = 0; i < GBuffer::Count; i++)
@@ -117,22 +124,35 @@ void Renderer::CreateSwapChainDependents()
     m_FrameBuffer.Create(&m_Device, m_RenderPass.Get(),
         m_SwapChain.GetImageViews(),
         m_DepthBuffer.GetView(),
-        gbufferViews, extent);
+        gbufferViews,
+        m_HDRBuffer.GetView(),
+        extent);
 
-    m_Descriptors.CreateLightingPool(&m_Device);
+    // Light buffers (shared by lighting and tone mapping sets)
+    std::vector<VkBuffer> lightBuffers(CommandManager::MAX_FRAMES_IN_FLIGHT);
+    for (int i = 0; i < CommandManager::MAX_FRAMES_IN_FLIGHT; i++)
+        lightBuffers[i] = m_UniformBuffer.GetLightBuffer(i);
+
+    // Lighting descriptor set
     std::array<VkImageView, 4> gbufferArr = {
         m_GBuffer.GetView(0), m_GBuffer.GetView(1),
         m_GBuffer.GetView(2), m_GBuffer.GetView(3)
     };
-    std::vector<VkBuffer> lightBuffers(CommandManager::MAX_FRAMES_IN_FLIGHT);
-    for (int i = 0; i < CommandManager::MAX_FRAMES_IN_FLIGHT; i++)
-        lightBuffers[i] = m_UniformBuffer.GetLightBuffer(i);
+    m_Descriptors.CreateLightingPool(&m_Device);
     m_Descriptors.CreateLightingSet(&m_Device, gbufferArr, lightBuffers,
         CommandManager::MAX_FRAMES_IN_FLIGHT);
+
+    // Tone mapping descriptor set
+    m_Descriptors.CreateToneMappingPool(&m_Device);
+    m_Descriptors.CreateToneMappingSet(&m_Device, m_HDRBuffer.GetView(),
+        lightBuffers, CommandManager::MAX_FRAMES_IN_FLIGHT);
 }
 
 void Renderer::DestroySwapChainDependents()
 {
+
+    m_Descriptors.DestroyToneMappingPool();
+    m_HDRBuffer.Destroy();
     m_Descriptors.DestroyLightingPool();
     m_FrameBuffer.Destroy();
     m_GBuffer.Destroy();
@@ -236,13 +256,16 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex)
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     vkBeginCommandBuffer(cmd, &beginInfo);
 
-    std::array<VkClearValue, 6> clearValues{};
-    clearValues[0].color = { {0.529f, 0.808f, 0.922f, 1.0f} }; // sky blue
+ 
+    
+    std::array<VkClearValue, 7> clearValues{};
+    clearValues[0].color = { {0.529f, 0.808f, 0.922f, 1.0f} };
     clearValues[1].depthStencil = { 1.0f, 0 };
     clearValues[2].color = { {0.0f, 0.0f, 0.0f, 0.0f} };
     clearValues[3].color = { {0.0f, 0.0f, 0.0f, 0.0f} };
     clearValues[4].color = { {0.0f, 0.0f, 0.0f, 0.0f} };
     clearValues[5].color = { {0.0f, 0.0f, 0.0f, 0.0f} };
+    clearValues[6].color = { {0.0f, 0.0f, 0.0f, 0.0f} }; // HDR
 
     VkRenderPassBeginInfo rpInfo{};
     rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -312,8 +335,20 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex)
         m_LightingPipeline.GetLayout(), 0, 1, &lightSet, 0, nullptr);
     vkCmdDraw(cmd, 3, 1, 0, 0);
 
+
+    // --- Subpass 3: Tone Mapping ---
+    vkCmdNextSubpass(cmd, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_ToneMappingPipeline.Get());
+    VkDescriptorSet tmSet = m_Descriptors.GetToneMappingSet(m_CurrentFrame);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        m_ToneMappingPipeline.GetLayout(), 0, 1, &tmSet, 0, nullptr);
+    vkCmdDraw(cmd, 3, 1, 0, 0);
+
+
     vkCmdEndRenderPass(cmd);
 
+
+ 
     if (vkEndCommandBuffer(cmd) != VK_SUCCESS)
         throw std::runtime_error("Failed to record command buffer!");
 }
@@ -323,16 +358,26 @@ void Renderer::UpdateUniformBuffer(uint32_t frame)
   
     UniformBufferObject ubo{};
     ubo.model = glm::scale(glm::mat4(1.0f), glm::vec3(0.008f));
-    ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    ubo.model = glm::rotate(ubo.model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
     ubo.view = m_Camera.GetView();
     ubo.proj = m_Camera.GetProjection();
 
     m_UniformBuffer.Update(frame, ubo);
 
     LightUBO light{};
+   
     light.dirLightDir = glm::vec4(glm::normalize(glm::vec3(-0.5f, -1.0f, -0.5f)), 0.0f);
-    light.dirLightColor = glm::vec4(1.0f, 0.95f, 0.8f, 3.0f);
     light.camPos = glm::vec4(m_Camera.GetPosition(), 0.0f);
+
+
+  
+    light.dirLightColor = glm::vec4(1.0f, 0.95f, 0.8f, 0.5); // 5 lux
+    light.aperture = 16.0f;
+    light.shutterSpeed = 1.0f / 200.0f;
+    light.iso = 100.0f;
+
+   
+
     m_UniformBuffer.UpdateLight(frame, light);
 }
 
@@ -369,7 +414,8 @@ void Renderer::DestroySyncObjects()
 
 void Renderer::CleanUp()
 {
-    DestroySwapChainDependents();
+
+    DestroySwapChainDependents(); // destroys ToneMappingPool, HDRBuffer, etc.
     m_SwapChain.DestroyImageViews();
     m_SwapChain.Destroy();
 
@@ -383,10 +429,12 @@ void Renderer::CleanUp()
     m_Descriptors.DestroyMaterialPool();
     m_Descriptors.DestroyMaterialLayout();
     m_Descriptors.DestroyLightingLayout();
+    m_Descriptors.DestroyToneMappingLayout(); // add this
 
     m_DepthPrepassPipeline.Destroy();
     m_GeometryPipeline.Destroy();
     m_LightingPipeline.Destroy();
+    m_ToneMappingPipeline.Destroy(); // add this
     m_RenderPass.Destroy();
 
     DestroySyncObjects();
