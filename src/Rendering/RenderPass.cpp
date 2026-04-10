@@ -11,9 +11,9 @@ void RenderPass::Create(Device* device, VkFormat colorFormat)
     VkFormat depthFormat = FindDepthFormat();
 
     // -------------------------------------------------------
-    // 7 attachments
+    // 8 attachments
     // -------------------------------------------------------
-    std::array<VkAttachmentDescription, 7> attachments{};
+    std::array<VkAttachmentDescription, 8> attachments{};
 
     // 0 - Swapchain
     attachments[0].format = colorFormat;
@@ -48,18 +48,19 @@ void RenderPass::Create(Device* device, VkFormat colorFormat)
         attachments[2 + i].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     }
 
-    // 6 - HDR image
-    attachments[6].format = HDRBuffer::Format;
-    attachments[6].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachments[6].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachments[6].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[6].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachments[6].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[6].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachments[6].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    // 7 - HDR image
+    constexpr int hdrIdx = 2 + GBuffer::Count;
+    attachments[hdrIdx].format = HDRBuffer::Format;
+    attachments[hdrIdx].samples = VK_SAMPLE_COUNT_1_BIT;
+    attachments[hdrIdx].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachments[hdrIdx].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachments[hdrIdx].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachments[hdrIdx].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachments[hdrIdx].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachments[hdrIdx].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     // -------------------------------------------------------
-    // Subpass 0 — Depth Prepass
+    // Subpass 0 ï¿½ Depth Prepass
     // -------------------------------------------------------
     VkAttachmentReference depthWriteRef{};
     depthWriteRef.attachment = 1;
@@ -71,10 +72,10 @@ void RenderPass::Create(Device* device, VkFormat colorFormat)
     subpass0.pDepthStencilAttachment = &depthWriteRef;
 
     // -------------------------------------------------------
-    // Subpass 1 — Geometry Pass
+    // Subpass 1 ï¿½ Geometry Pass
     // -------------------------------------------------------
-    std::array<VkAttachmentReference, 4> gbufferColorRefs{};
-    for (int i = 0; i < 4; i++)
+    std::array<VkAttachmentReference, GBuffer::Count> gbufferColorRefs{};
+    for (int i = 0; i < GBuffer::Count; i++)
     {
         gbufferColorRefs[i].attachment = 2 + i;
         gbufferColorRefs[i].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -86,19 +87,19 @@ void RenderPass::Create(Device* device, VkFormat colorFormat)
 
     VkSubpassDescription subpass1{};
     subpass1.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass1.colorAttachmentCount = 4;
+    subpass1.colorAttachmentCount = GBuffer::Count;
     subpass1.pColorAttachments = gbufferColorRefs.data();
     subpass1.pDepthStencilAttachment = &depthReadRef;
 
     // -------------------------------------------------------
-    // Subpass 2 — Lighting Pass (writes to HDR image)
+    // Subpass 2 ï¿½ Lighting Pass (writes to HDR image)
     // -------------------------------------------------------
     VkAttachmentReference hdrColorRef{};
-    hdrColorRef.attachment = 6;
+    hdrColorRef.attachment = hdrIdx;
     hdrColorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-    std::array<VkAttachmentReference, 4> gbufferInputRefs{};
-    for (int i = 0; i < 4; i++)
+    std::array<VkAttachmentReference, GBuffer::Count> gbufferInputRefs{};
+    for (int i = 0; i < GBuffer::Count; i++)
     {
         gbufferInputRefs[i].attachment = 2 + i;
         gbufferInputRefs[i].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -108,18 +109,18 @@ void RenderPass::Create(Device* device, VkFormat colorFormat)
     subpass2.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass2.colorAttachmentCount = 1;
     subpass2.pColorAttachments = &hdrColorRef;
-    subpass2.inputAttachmentCount = 4;
+    subpass2.inputAttachmentCount = GBuffer::Count;
     subpass2.pInputAttachments = gbufferInputRefs.data();
 
     // -------------------------------------------------------
-    // Subpass 3 — Tone Mapping (reads HDR, writes to swapchain)
+    // Subpass 3 ï¿½ Tone Mapping (reads HDR, writes to swapchain)
     // -------------------------------------------------------
     VkAttachmentReference swapchainColorRef{};
     swapchainColorRef.attachment = 0;
     swapchainColorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkAttachmentReference hdrInputRef{};
-    hdrInputRef.attachment = 6;
+    hdrInputRef.attachment = hdrIdx;
     hdrInputRef.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     VkSubpassDescription subpass3{};

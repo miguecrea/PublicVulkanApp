@@ -4,7 +4,7 @@
 #include <stdexcept>
 
 // -------------------------------------------------------
-// Camera layout — binding 0: UBO (vertex)
+// Camera layout ï¿½ binding 0: UBO (vertex)
 // -------------------------------------------------------
 void Descriptors::CreateCameraLayout(Device* device)
 {
@@ -290,8 +290,8 @@ void Descriptors::CreateLightingLayout(Device* device)
 {
     m_Device = device;
 
-    std::array<VkDescriptorSetLayoutBinding, 5> bindings{};
-    for (int i = 0; i < 4; i++)
+    std::array<VkDescriptorSetLayoutBinding, 6> bindings{};
+    for (int i = 0; i < 5; i++)
     {
         bindings[i].binding = i;
         bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
@@ -299,14 +299,14 @@ void Descriptors::CreateLightingLayout(Device* device)
         bindings[i].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     }
 
-    bindings[4].binding = 4;
-    bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    bindings[4].descriptorCount = 1;
-    bindings[4].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[5].binding = 5;
+    bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    bindings[5].descriptorCount = 1;
+    bindings[5].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     VkDescriptorSetLayoutCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    info.bindingCount = 5;
+    info.bindingCount = 6;
     info.pBindings = bindings.data();
 
     if (vkCreateDescriptorSetLayout(device->GetLogical(), &info, nullptr, &m_LightingLayout) != VK_SUCCESS)
@@ -317,7 +317,7 @@ void Descriptors::CreateLightingPool(Device* device)
 {
     std::array<VkDescriptorPoolSize, 2> sizes{};
     sizes[0].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-    sizes[0].descriptorCount = 4 * 2; // 4 attachments * MAX_FRAMES
+    sizes[0].descriptorCount = 5 * 2; // 5 attachments * MAX_FRAMES
     sizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     sizes[1].descriptorCount = 2; // MAX_FRAMES
 
@@ -332,7 +332,7 @@ void Descriptors::CreateLightingPool(Device* device)
 }
 
 void Descriptors::CreateLightingSet(Device* device,
-    const std::array<VkImageView, 4>& gbufferViews,
+    const std::array<VkImageView, 5>& gbufferViews,
     const std::vector<VkBuffer>& lightBuffers, int framesInFlight)
 {
     std::vector<VkDescriptorSetLayout> layouts(framesInFlight, m_LightingLayout);
@@ -348,10 +348,10 @@ void Descriptors::CreateLightingSet(Device* device,
 
     for (int f = 0; f < framesInFlight; f++)
     {
-        std::array<VkDescriptorImageInfo, 4> imageInfos{};
-        std::array<VkWriteDescriptorSet, 5> writes{};
+        std::array<VkDescriptorImageInfo, 5> imageInfos{};
+        std::array<VkWriteDescriptorSet, 6> writes{};
 
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 5; i++)
         {
             imageInfos[i].imageView = gbufferViews[i];
             imageInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -369,14 +369,14 @@ void Descriptors::CreateLightingSet(Device* device,
         lightInfo.offset = 0;
         lightInfo.range = sizeof(LightUBO);
 
-        writes[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        writes[4].dstSet = m_LightingSets[f];
-        writes[4].dstBinding = 4;
-        writes[4].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        writes[4].descriptorCount = 1;
-        writes[4].pBufferInfo = &lightInfo;
+        writes[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[5].dstSet = m_LightingSets[f];
+        writes[5].dstBinding = 5;
+        writes[5].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        writes[5].descriptorCount = 1;
+        writes[5].pBufferInfo = &lightInfo;
 
-        vkUpdateDescriptorSets(device->GetLogical(), 5, writes.data(), 0, nullptr);
+        vkUpdateDescriptorSets(device->GetLogical(), 6, writes.data(), 0, nullptr);
     }
 }
 

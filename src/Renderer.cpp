@@ -179,9 +179,10 @@ void Renderer::CreateSwapChainDependents()
     for (int i = 0; i < CommandManager::MAX_FRAMES_IN_FLIGHT; i++)
         lightBuffers[i] = m_UniformBuffer.GetLightBuffer(i);
 
-    std::array<VkImageView, 4> gbufferArr = {
+    std::array<VkImageView, 5> gbufferArr = {
         m_GBuffer.GetView(0), m_GBuffer.GetView(1),
-        m_GBuffer.GetView(2), m_GBuffer.GetView(3)
+        m_GBuffer.GetView(2), m_GBuffer.GetView(3),
+        m_GBuffer.GetView(4)
     };
     m_Descriptors.CreateLightingPool(&m_Device);
     m_Descriptors.CreateLightingSet(&m_Device, gbufferArr, lightBuffers,
@@ -299,7 +300,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex)
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     vkBeginCommandBuffer(cmd, &beginInfo);
 
-    std::array<VkClearValue, 7> clearValues{};
+    std::array<VkClearValue, 8> clearValues{};
     clearValues[0].color = { {0.529f, 0.808f, 0.922f, 1.0f} };
     clearValues[1].depthStencil = { 1.0f, 0 };
     clearValues[2].color = { {0.0f, 0.0f, 0.0f, 0.0f} };
@@ -307,6 +308,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex)
     clearValues[4].color = { {0.0f, 0.0f, 0.0f, 0.0f} };
     clearValues[5].color = { {0.0f, 0.0f, 0.0f, 0.0f} };
     clearValues[6].color = { {0.0f, 0.0f, 0.0f, 0.0f} };
+    clearValues[7].color = { {0.0f, 0.0f, 0.0f, 0.0f} };
 
     VkRenderPassBeginInfo rpInfo{};
     rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -429,7 +431,7 @@ void Renderer::UpdateUniformBuffer(uint32_t frame)
 
     LightUBO light{};
     light.dirLightDir = glm::vec4(glm::normalize(glm::vec3(-0.5f, -1.0f, -0.5f)), 0.0f);
-    light.dirLightColor = glm::vec4(1.0f, 0.95f, 0.8f,2.0f);
+    light.dirLightColor = glm::vec4(1.0f, 0.95f, 0.8f, 100000.0f);
     light.camPos = glm::vec4(m_Camera.GetPosition(), 0.0f);
     light.aperture = 16.0f;
     light.shutterSpeed = 1.0f / 200.0f;

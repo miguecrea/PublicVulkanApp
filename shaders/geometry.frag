@@ -12,7 +12,6 @@ layout(set = 1, binding = 2) uniform MaterialUBO {
     float hasEmissive;
     float alphaMask;
     float alphaCutoff;
-    float padding[2];
 } material;
 layout(set = 1, binding = 3) uniform sampler2D metallicRoughnessMap;
 layout(set = 1, binding = 4) uniform sampler2D aoMap;
@@ -26,6 +25,7 @@ layout(location = 0) out vec4 outPosition;
 layout(location = 1) out vec4 outNormal;
 layout(location = 2) out vec4 outAlbedo;
 layout(location = 3) out vec4 outMetallicRoughness;
+layout(location = 4) out vec4 outEmissive;
 
 void main()
 {
@@ -49,18 +49,10 @@ void main()
     }
     outNormal = vec4(N * 0.5 + 0.5, 0.0);
 
-    // Albedo + AO
-    vec3 albedo = albedoSample.rgb;
-    if (material.hasAO > 0.5)
-        albedo *= texture(aoMap, fragTexCoord).r;
+    // Albedo (clean, no AO or emissive baked in)
+    outAlbedo = vec4(albedoSample.rgb, albedoSample.a);
 
-    // Add emissive
-    if (material.hasEmissive > 0.5)
-        albedo += texture(emissiveMap, fragTexCoord).rgb;
-
-    outAlbedo = vec4(albedo, albedoSample.a);
-
-    // Metallic/Roughness
+    // Metallic/Roughness + AO in B channel
     float metallic  = material.metallicFactor;
     float roughness = material.roughnessFactor;
     if (material.hasMetallicRoughness > 0.5)
@@ -69,5 +61,16 @@ void main()
         roughness = mrSample.g;
         metallic  = mrSample.b;
     }
-    outMetallicRoughness = vec4(metallic, roughness, 0.0, 0.0);
+
+    float ao = 1.0;
+    if (material.hasAO > 0.5)
+        ao = texture(aoMap, fragTexCoord).r;
+
+    outMetallicRoughness = vec4(metallic, roughness, ao, 0.0);
+
+    // Emissive (separate output, unlit contribution)
+    vec3 emissive = vec3(0.0);
+    if (material.hasEmissive > 0.5)
+        emissive = texture(emissiveMap, fragTexCoord).rgb;
+    outEmissive = vec4(emissive, 0.0);
 }

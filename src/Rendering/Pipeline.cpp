@@ -89,7 +89,7 @@ void Pipeline::CreateDepthPrepass(Device* device, VkRenderPass renderPass,
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizer.cullMode = VK_CULL_MODE_NONE;
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
     VkPipelineMultisampleStateCreateInfo multisampling{};
@@ -193,12 +193,12 @@ void Pipeline::CreateGeometry(Device* device, VkRenderPass renderPass,
         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     blendAttachment.blendEnable = VK_FALSE;
 
-    std::array<VkPipelineColorBlendAttachmentState, 4> blendAttachments;
+    std::array<VkPipelineColorBlendAttachmentState, 5> blendAttachments;
     blendAttachments.fill(blendAttachment);
 
     VkPipelineColorBlendStateCreateInfo colorBlending{};
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlending.attachmentCount = 4;
+    colorBlending.attachmentCount = 5;
     colorBlending.pAttachments = blendAttachments.data();
 
     std::vector<VkDynamicState> dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };

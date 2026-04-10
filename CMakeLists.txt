@@ -63,7 +63,7 @@ find_package(Vulkan REQUIRED)
 # -------------------------------------------------------
 find_program(GLSLC glslc HINTS $ENV{VULKAN_SDK}/Bin)
 
-set(SHADER_SOURCE_DIR ${CMAKE_SOURCE_DIR}/Shaders)
+set(SHADER_SOURCE_DIR ${CMAKE_SOURCE_DIR}/shaders)
 set(SHADER_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/ShadersOutput)
 file(MAKE_DIRECTORY ${SHADER_OUTPUT_DIR})
 

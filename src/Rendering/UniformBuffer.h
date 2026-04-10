@@ -24,7 +24,6 @@ struct MaterialUBO
     alignas(4)  float hasEmissive;
     alignas(4)  float alphaMask;
     alignas(4)  float alphaCutoff;
-    alignas(4)  float padding[2];
 };
 
 

@@ -13,7 +13,6 @@ layout(set = 1, binding = 2) uniform MaterialUBO {
     float hasEmissive;
     float alphaMask;
     float alphaCutoff;
-    float padding[2];
 } material;
 
 layout(location = 0) in vec2 fragTexCoord;

@@ -16,14 +16,15 @@ void FrameBuffer::Create(Device* device, VkRenderPass renderPass,
 
     for (size_t i = 0; i < swapchainViews.size(); i++)
     {
-        std::array<VkImageView, 7> attachments = {
+        std::array<VkImageView, 8> attachments = {
             swapchainViews[i],  // 0 - swapchain
             depthView,          // 1 - depth
             gbufferViews[0],    // 2 - position
             gbufferViews[1],    // 3 - normal
             gbufferViews[2],    // 4 - albedo
             gbufferViews[3],    // 5 - metallic/roughness
-            hdrView,            // 6 - HDR
+            gbufferViews[4],    // 6 - emissive
+            hdrView,            // 7 - HDR
         };
 
         VkFramebufferCreateInfo fbInfo{};
