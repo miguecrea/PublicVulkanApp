@@ -85,8 +85,12 @@ void main()
 
 
 
-    float metallic  = mr.b; // glTF: B = metallic
-    float roughness = max(mr.g, 0.04); // glTF: G = roughness
+
+      float metallic  = mr.r; // R=metallic
+      float roughness = max(mr.g, 0.04); // G=roughness
+
+    //float metallic  = mr.b; // glTF: B = metallic
+  //  float roughness = max(mr.g, 0.04); // glTF: G = roughness
 
 
 

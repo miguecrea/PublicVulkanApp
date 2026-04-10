@@ -79,9 +79,15 @@ private:
 
 
 
-    //MESH and scene 
-    GltfScene              m_Scene;
-    std::vector<Buffer>    m_Meshes;    // one per GltfMesh
+ 
+    struct RenderableScene
+    {
+        GltfScene           scene;
+        std::vector<Buffer> meshes;
+        int                 materialOffset = 0; // offset into global material array
+    };
+
+    std::vector<RenderableScene> m_Scenes;
     Texture                m_FallbackTexture; // white 1x1 for missing textures
 
 

@@ -12,11 +12,21 @@ static std::string ShaderPath(const std::string& name)
 
 void Pipeline::BuildLayout(VkDescriptorSetLayout cameraLayout, VkDescriptorSetLayout materialLayout)
 {
+   
     std::array<VkDescriptorSetLayout, 2> layouts = { cameraLayout, materialLayout };
+
+    VkPushConstantRange pushRange{};
+    pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushRange.offset = 0;
+    pushRange.size = sizeof(glm::mat4);
+
     VkPipelineLayoutCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     info.setLayoutCount = 2;
     info.pSetLayouts = layouts.data();
+    info.pushConstantRangeCount = 1;
+    info.pPushConstantRanges = &pushRange;
+
     if (vkCreatePipelineLayout(m_Device->GetLogical(), &info, nullptr, &m_Layout) != VK_SUCCESS)
         throw std::runtime_error("Failed to create pipeline layout!");
 }
@@ -49,8 +59,12 @@ void Pipeline::CreateDepthPrepass(Device* device, VkRenderPass renderPass,
 
     // rest is identical to your existing CreateDepthPrepass...
     auto vertCode = ReadFile(ShaderPath("depth_prepass.vert"));
+    auto fragCode = ReadFile(ShaderPath("depth_prepass.frag")); // add
     auto vertModule = CreateShaderModule(vertCode);
-    VkPipelineShaderStageCreateInfo stages[] = { MakeStage(VK_SHADER_STAGE_VERTEX_BIT, vertModule) };
+    auto fragModule = CreateShaderModule(fragCode); // add
+    VkPipelineShaderStageCreateInfo stages[] = 
+    { MakeStage(VK_SHADER_STAGE_VERTEX_BIT, vertModule),
+     MakeStage(VK_SHADER_STAGE_FRAGMENT_BIT, fragModule) };
 
     auto bindingDesc = Vertex::GetBindingDescription();
     auto attrDescs = Vertex::GetAttributeDescriptions();
@@ -100,7 +114,7 @@ void Pipeline::CreateDepthPrepass(Device* device, VkRenderPass renderPass,
 
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount = 1;
+    pipelineInfo.stageCount = 2;
     pipelineInfo.pStages = stages;
     pipelineInfo.pVertexInputState = &vertexInput;
     pipelineInfo.pInputAssemblyState = &inputAssembly;
@@ -118,6 +132,7 @@ void Pipeline::CreateDepthPrepass(Device* device, VkRenderPass renderPass,
         throw std::runtime_error("Failed to create depth prepass pipeline!");
 
     vkDestroyShaderModule(device->GetLogical(), vertModule, nullptr);
+    vkDestroyShaderModule(device->GetLogical(), fragModule, nullptr);
 }
 
 void Pipeline::CreateGeometry(Device* device, VkRenderPass renderPass,
@@ -158,7 +173,7 @@ void Pipeline::CreateGeometry(Device* device, VkRenderPass renderPass,
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizer.cullMode = VK_CULL_MODE_NONE;
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     //for clipping geometry
  

@@ -74,7 +74,7 @@ void main()
       vec3 hdrColor = subpassLoad(inHDR).rgb;
 
     // Simple exposure control - adjust this value to brighten/darken
-    float exposure = 3.0;
+    float exposure = 1.6;
     hdrColor *= exposure;
 
     vec3 ldrColor = ACESFilmToneMapping(hdrColor);

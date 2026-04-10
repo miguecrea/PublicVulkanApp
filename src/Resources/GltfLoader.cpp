@@ -40,7 +40,6 @@ static VkSampler CreateDefaultSampler(Device* device)
     info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     info.anisotropyEnable = VK_TRUE;
-    info.anisotropyEnable = VK_FALSE;
     info.maxAnisotropy = 1.0f;
     info.maxLod = VK_LOD_CLAMP_NONE;
 
@@ -145,6 +144,8 @@ GltfScene GltfLoader::Load(
     // -------------------------------------------------------
     for (auto& mat : model.materials)
     {
+
+   
         Material m{};
         auto& pbr = mat.pbrMetallicRoughness;
 
@@ -170,6 +171,32 @@ GltfScene GltfLoader::Load(
             UploadTexture(model, mat.normalTexture.index, false,
                 device, cmdManager, scene, m.normalView, m.normalSampler);
             m.hasNormalMap = (m.normalView != VK_NULL_HANDLE);
+        }
+
+        if (pbr.metallicRoughnessTexture.index >= 0)
+        {
+            UploadTexture(model, pbr.metallicRoughnessTexture.index, false,
+                device, cmdManager, scene,
+                m.metallicRoughnessView, m.metallicRoughnessSampler);
+            m.hasMetallicRoughness = (m.metallicRoughnessView != VK_NULL_HANDLE);
+        }
+
+        // AO (linear)
+        if (mat.occlusionTexture.index >= 0)
+        {
+            UploadTexture(model, mat.occlusionTexture.index, false,
+                device, cmdManager, scene,
+                m.aoView, m.aoSampler);
+            m.hasAO = (m.aoView != VK_NULL_HANDLE);
+        }
+
+        // Emissive (sRGB)
+        if (mat.emissiveTexture.index >= 0)
+        {
+            UploadTexture(model, mat.emissiveTexture.index, true,
+                device, cmdManager, scene,
+                m.emissiveView, m.emissiveSampler);
+            m.hasEmissive = (m.emissiveView != VK_NULL_HANDLE);
         }
 
         scene.materials.push_back(m);

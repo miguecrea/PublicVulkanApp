@@ -92,39 +92,64 @@ void Descriptors::DestroyCameraPool()
 // -------------------------------------------------------
 void Descriptors::CreateMaterialLayout(Device* device)
 {
+
     m_Device = device;
 
-    std::array<VkDescriptorSetLayoutBinding, 3> bindings{};
+    std::array<VkDescriptorSetLayoutBinding, 6> bindings{};
 
+    // binding 0: albedo
     bindings[0].binding = 0;
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     bindings[0].descriptorCount = 1;
     bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+    // binding 1: normal
     bindings[1].binding = 1;
     bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     bindings[1].descriptorCount = 1;
     bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+    // binding 2: material UBO
     bindings[2].binding = 2;
     bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     bindings[2].descriptorCount = 1;
     bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+    // binding 3: metallic/roughness
+    bindings[3].binding = 3;
+    bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[3].descriptorCount = 1;
+    bindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    // binding 4: AO
+    bindings[4].binding = 4;
+    bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[4].descriptorCount = 1;
+    bindings[4].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    // binding 5: emissive
+    bindings[5].binding = 5;
+    bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[5].descriptorCount = 1;
+    bindings[5].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
     VkDescriptorSetLayoutCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    info.bindingCount = 3;
+    info.bindingCount = 6;
     info.pBindings = bindings.data();
 
     if (vkCreateDescriptorSetLayout(device->GetLogical(), &info, nullptr, &m_MaterialLayout) != VK_SUCCESS)
         throw std::runtime_error("Failed to create material descriptor layout!");
+   
+
 }
 
 void Descriptors::CreateMaterialPool(Device* device, int materialCount)
 {
+  
     std::array<VkDescriptorPoolSize, 2> sizes{};
     sizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    sizes[0].descriptorCount = materialCount * 2; // albedo + normal
+    sizes[0].descriptorCount = materialCount * 5; // albedo+normal+mr+ao+emissive
     sizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     sizes[1].descriptorCount = materialCount;
 
@@ -144,6 +169,12 @@ void Descriptors::CreateMaterialSets(Device* device, int materialCount,
     const std::vector<VkSampler>& albedoSamplers,
     const std::vector<VkImageView>& normalViews,
     const std::vector<VkSampler>& normalSamplers,
+    const std::vector<VkImageView>& mrViews,
+    const std::vector<VkSampler>& mrSamplers,
+    const std::vector<VkImageView>& aoViews,
+    const std::vector<VkSampler>& aoSamplers,
+    const std::vector<VkImageView>& emissiveViews,
+    const std::vector<VkSampler>& emissiveSamplers,
     VkImageView fallbackView, VkSampler fallbackSampler)
 {
     std::vector<VkDescriptorSetLayout> layouts(materialCount, m_MaterialLayout);
@@ -159,25 +190,40 @@ void Descriptors::CreateMaterialSets(Device* device, int materialCount,
 
     for (int i = 0; i < materialCount; i++)
     {
-        // Albedo
+        auto getView = [&](VkImageView v) { return v != VK_NULL_HANDLE ? v : fallbackView; };
+        auto getSampler = [&](VkSampler s) { return s != VK_NULL_HANDLE ? s : fallbackSampler; };
+
         VkDescriptorImageInfo albedoInfo{};
         albedoInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        albedoInfo.imageView = albedoViews[i] != VK_NULL_HANDLE ? albedoViews[i] : fallbackView;
-        albedoInfo.sampler = albedoSamplers[i] != VK_NULL_HANDLE ? albedoSamplers[i] : fallbackSampler;
+        albedoInfo.imageView = getView(albedoViews[i]);
+        albedoInfo.sampler = getSampler(albedoSamplers[i]);
 
-        // Normal
         VkDescriptorImageInfo normalInfo{};
         normalInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        normalInfo.imageView = normalViews[i] != VK_NULL_HANDLE ? normalViews[i] : fallbackView;
-        normalInfo.sampler = normalSamplers[i] != VK_NULL_HANDLE ? normalSamplers[i] : fallbackSampler;
+        normalInfo.imageView = getView(normalViews[i]);
+        normalInfo.sampler = getSampler(normalSamplers[i]);
 
-        // Material UBO
         VkDescriptorBufferInfo matInfo{};
         matInfo.buffer = materialUBOs[i];
         matInfo.offset = 0;
         matInfo.range = sizeof(MaterialUBO);
 
-        std::array<VkWriteDescriptorSet, 3> writes{};
+        VkDescriptorImageInfo mrInfo{};
+        mrInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        mrInfo.imageView = getView(mrViews[i]);
+        mrInfo.sampler = getSampler(mrSamplers[i]);
+
+        VkDescriptorImageInfo aoInfo{};
+        aoInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        aoInfo.imageView = getView(aoViews[i]);
+        aoInfo.sampler = getSampler(aoSamplers[i]);
+
+        VkDescriptorImageInfo emissiveInfo{};
+        emissiveInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        emissiveInfo.imageView = getView(emissiveViews[i]);
+        emissiveInfo.sampler = getSampler(emissiveSamplers[i]);
+
+        std::array<VkWriteDescriptorSet, 6> writes{};
 
         writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes[0].dstSet = m_MaterialSets[i];
@@ -200,7 +246,28 @@ void Descriptors::CreateMaterialSets(Device* device, int materialCount,
         writes[2].descriptorCount = 1;
         writes[2].pBufferInfo = &matInfo;
 
-        vkUpdateDescriptorSets(device->GetLogical(), 3, writes.data(), 0, nullptr);
+        writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[3].dstSet = m_MaterialSets[i];
+        writes[3].dstBinding = 3;
+        writes[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writes[3].descriptorCount = 1;
+        writes[3].pImageInfo = &mrInfo;
+
+        writes[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[4].dstSet = m_MaterialSets[i];
+        writes[4].dstBinding = 4;
+        writes[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writes[4].descriptorCount = 1;
+        writes[4].pImageInfo = &aoInfo;
+
+        writes[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[5].dstSet = m_MaterialSets[i];
+        writes[5].dstBinding = 5;
+        writes[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writes[5].descriptorCount = 1;
+        writes[5].pImageInfo = &emissiveInfo;
+
+        vkUpdateDescriptorSets(device->GetLogical(), 6, writes.data(), 0, nullptr);
     }
 }
 

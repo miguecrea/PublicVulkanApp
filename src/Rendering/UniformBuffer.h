@@ -14,13 +14,17 @@ struct UniformBufferObject
 
 struct MaterialUBO
 {
+    
     alignas(16) glm::vec4 baseColorFactor;
     alignas(4)  float metallicFactor;
     alignas(4)  float roughnessFactor;
     alignas(4)  float hasNormalMap;
-    alignas(4)  float alphaMask;    // add
-    alignas(4)  float alphaCutoff;  // add
-    alignas(4)  float padding[2];   // keep 16 byte alignment
+    alignas(4)  float hasMetallicRoughness;
+    alignas(4)  float hasAO;
+    alignas(4)  float hasEmissive;
+    alignas(4)  float alphaMask;
+    alignas(4)  float alphaCutoff;
+    alignas(4)  float padding[2];
 };
 
 

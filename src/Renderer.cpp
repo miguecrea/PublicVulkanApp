@@ -31,32 +31,87 @@ void Renderer::Init()
     m_CommandManager.AllocateCommandBuffers();
     m_RenderPass.Create(&m_Device, m_SwapChain.GetFormat());
 
-    // Load Sponza
+     //Load Sponza
+    RenderableScene sponza;
     std::string sponzaPath = std::string(PROJECT_SOURCE_DIR) + "/Models/Sponza/sponza.gltf";
-    m_Scene = GltfLoader::Load(sponzaPath, &m_Device, &m_CommandManager);
+    sponza.scene = GltfLoader::Load(sponzaPath, &m_Device, &m_CommandManager);
+    sponza.meshes.resize(sponza.scene.meshes.size());
+    for (int i = 0; i < (int)sponza.scene.meshes.size(); i++)
+        sponza.meshes[i].UploadMesh(&m_Device, &m_CommandManager, sponza.scene.meshes[i].mesh);
+    sponza.materialOffset = 0;
+    m_Scenes.push_back(std::move(sponza));
 
-    // Upload all meshes
-    m_Meshes.resize(m_Scene.meshes.size());
-    for (int i = 0; i < (int)m_Scene.meshes.size(); i++)
-        m_Meshes[i].UploadMesh(&m_Device, &m_CommandManager, m_Scene.meshes[i].mesh);
 
-    // Fallback white texture for materials with no albedo
+
+
+
+
+    // Load DamagedHelmet
+    RenderableScene helmet;
+    std::string helmetPath = std::string(PROJECT_SOURCE_DIR) + "/Models/DamagedHelmet/DamagedHelmet.gltf";
+    helmet.scene = GltfLoader::Load(helmetPath, &m_Device, &m_CommandManager);
+    helmet.meshes.resize(helmet.scene.meshes.size());
+    for (int i = 0; i < (int)helmet.scene.meshes.size(); i++)
+        helmet.meshes[i].UploadMesh(&m_Device, &m_CommandManager, helmet.scene.meshes[i].mesh);
+    helmet.materialOffset = (int)m_Scenes[0].scene.materials.size();
+    m_Scenes.push_back(std::move(helmet));
+
+
+
+
+
+
+    // Fallback white texture
     m_FallbackTexture.Load(&m_Device, &m_CommandManager,
         std::string(PROJECT_SOURCE_DIR) + "/Textures/white.png");
 
     // Uniform buffers
     m_UniformBuffer.Create(&m_Device, CommandManager::MAX_FRAMES_IN_FLIGHT);
 
-    int matCount = (int)m_Scene.materials.size();
-    m_UniformBuffer.CreateMaterialBuffers(&m_Device, matCount);
-    for (int i = 0; i < matCount; i++)
+    // Collect all materials from all scenes
+    int totalMatCount = 0;
+    for (auto& rs : m_Scenes)
+        totalMatCount += (int)rs.scene.materials.size();
+
+    m_UniformBuffer.CreateMaterialBuffers(&m_Device, totalMatCount);
+
+    std::vector<VkImageView> albedoViews(totalMatCount), normalViews(totalMatCount);
+    std::vector<VkSampler>   albedoSamplers(totalMatCount), normalSamplers(totalMatCount);
+    std::vector<VkImageView> mrViews(totalMatCount), aoViews(totalMatCount), emissiveViews(totalMatCount);
+    std::vector<VkSampler>   mrSamplers(totalMatCount), aoSamplers(totalMatCount), emissiveSamplers(totalMatCount);
+    std::vector<VkBuffer>    matBuffers(totalMatCount);
+
+    int globalMatIdx = 0;
+    for (auto& rs : m_Scenes)
     {
-        MaterialUBO mubo{};
-        mubo.baseColorFactor = m_Scene.materials[i].baseColorFactor;
-        mubo.metallicFactor = m_Scene.materials[i].metallicFactor;
-        mubo.roughnessFactor = m_Scene.materials[i].roughnessFactor;
-        mubo.hasNormalMap = m_Scene.materials[i].hasNormalMap ? 1.0f : 0.0f;
-        m_UniformBuffer.UpdateMaterial(i, mubo);
+        for (int i = 0; i < (int)rs.scene.materials.size(); i++, globalMatIdx++)
+        {
+            auto& mat = rs.scene.materials[i];
+
+            MaterialUBO mubo{};
+            mubo.baseColorFactor = mat.baseColorFactor;
+            mubo.metallicFactor = mat.metallicFactor;
+            mubo.roughnessFactor = mat.roughnessFactor;
+            mubo.hasNormalMap = mat.hasNormalMap ? 1.0f : 0.0f;
+            mubo.hasMetallicRoughness = mat.hasMetallicRoughness ? 1.0f : 0.0f;
+            mubo.hasAO = mat.hasAO ? 1.0f : 0.0f;
+            mubo.hasEmissive = mat.hasEmissive ? 1.0f : 0.0f;
+            mubo.alphaMask = mat.alphaMask ? 1.0f : 0.0f;
+            mubo.alphaCutoff = mat.alphaCutoff;
+            m_UniformBuffer.UpdateMaterial(globalMatIdx, mubo);
+
+            albedoViews[globalMatIdx] = mat.albedoView;
+            albedoSamplers[globalMatIdx] = mat.albedoSampler;
+            normalViews[globalMatIdx] = mat.normalView;
+            normalSamplers[globalMatIdx] = mat.normalSampler;
+            mrViews[globalMatIdx] = mat.metallicRoughnessView;
+            mrSamplers[globalMatIdx] = mat.metallicRoughnessSampler;
+            aoViews[globalMatIdx] = mat.aoView;
+            aoSamplers[globalMatIdx] = mat.aoSampler;
+            emissiveViews[globalMatIdx] = mat.emissiveView;
+            emissiveSamplers[globalMatIdx] = mat.emissiveSampler;
+            matBuffers[globalMatIdx] = m_UniformBuffer.GetMaterialBuffer(globalMatIdx);
+        }
     }
 
     // Camera descriptors (set 0)
@@ -69,25 +124,20 @@ void Renderer::Init()
 
     // Material descriptors (set 1)
     m_Descriptors.CreateMaterialLayout(&m_Device);
-    m_Descriptors.CreateMaterialPool(&m_Device, matCount);
-
-    std::vector<VkImageView> albedoViews(matCount), normalViews(matCount);
-    std::vector<VkSampler>   albedoSamplers(matCount), normalSamplers(matCount);
-    std::vector<VkBuffer>    matBuffers(matCount);
-    for (int i = 0; i < matCount; i++)
-    {
-        albedoViews[i] = m_Scene.materials[i].albedoView;
-        albedoSamplers[i] = m_Scene.materials[i].albedoSampler;
-        normalViews[i] = m_Scene.materials[i].normalView;
-        normalSamplers[i] = m_Scene.materials[i].normalSampler;
-        matBuffers[i] = m_UniformBuffer.GetMaterialBuffer(i);
-    }
-    m_Descriptors.CreateMaterialSets(&m_Device, matCount, matBuffers,
-        albedoViews, albedoSamplers, normalViews, normalSamplers,
+    m_Descriptors.CreateMaterialPool(&m_Device, totalMatCount);
+    m_Descriptors.CreateMaterialSets(&m_Device, totalMatCount, matBuffers,
+        albedoViews, albedoSamplers,
+        normalViews, normalSamplers,
+        mrViews, mrSamplers,
+        aoViews, aoSamplers,
+        emissiveViews, emissiveSamplers,
         m_FallbackTexture.GetView(), m_FallbackTexture.GetSampler());
 
-    // Lighting layout (set created in CreateSwapChainDependents)
+    // Lighting layout
     m_Descriptors.CreateLightingLayout(&m_Device);
+
+    // Tone mapping layout
+    m_Descriptors.CreateToneMappingLayout(&m_Device);
 
     // Pipelines
     m_DepthPrepassPipeline.CreateDepthPrepass(&m_Device, m_RenderPass.Get(),
@@ -96,9 +146,6 @@ void Renderer::Init()
         m_Descriptors.GetCameraLayout(), m_Descriptors.GetMaterialLayout());
     m_LightingPipeline.CreateLighting(&m_Device, m_RenderPass.Get(),
         m_Descriptors.GetLightingLayout());
-
-    //tone mapping pipeline 
-    m_Descriptors.CreateToneMappingLayout(&m_Device);
     m_ToneMappingPipeline.CreateToneMapping(&m_Device, m_RenderPass.Get(),
         m_Descriptors.GetToneMappingLayout());
 
@@ -128,12 +175,10 @@ void Renderer::CreateSwapChainDependents()
         m_HDRBuffer.GetView(),
         extent);
 
-    // Light buffers (shared by lighting and tone mapping sets)
     std::vector<VkBuffer> lightBuffers(CommandManager::MAX_FRAMES_IN_FLIGHT);
     for (int i = 0; i < CommandManager::MAX_FRAMES_IN_FLIGHT; i++)
         lightBuffers[i] = m_UniformBuffer.GetLightBuffer(i);
 
-    // Lighting descriptor set
     std::array<VkImageView, 4> gbufferArr = {
         m_GBuffer.GetView(0), m_GBuffer.GetView(1),
         m_GBuffer.GetView(2), m_GBuffer.GetView(3)
@@ -142,7 +187,6 @@ void Renderer::CreateSwapChainDependents()
     m_Descriptors.CreateLightingSet(&m_Device, gbufferArr, lightBuffers,
         CommandManager::MAX_FRAMES_IN_FLIGHT);
 
-    // Tone mapping descriptor set
     m_Descriptors.CreateToneMappingPool(&m_Device);
     m_Descriptors.CreateToneMappingSet(&m_Device, m_HDRBuffer.GetView(),
         lightBuffers, CommandManager::MAX_FRAMES_IN_FLIGHT);
@@ -150,11 +194,10 @@ void Renderer::CreateSwapChainDependents()
 
 void Renderer::DestroySwapChainDependents()
 {
-
     m_Descriptors.DestroyToneMappingPool();
-    m_HDRBuffer.Destroy();
     m_Descriptors.DestroyLightingPool();
     m_FrameBuffer.Destroy();
+    m_HDRBuffer.Destroy();
     m_GBuffer.Destroy();
     m_DepthBuffer.Destroy();
 }
@@ -256,8 +299,6 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex)
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     vkBeginCommandBuffer(cmd, &beginInfo);
 
- 
-    
     std::array<VkClearValue, 7> clearValues{};
     clearValues[0].color = { {0.529f, 0.808f, 0.922f, 1.0f} };
     clearValues[1].depthStencil = { 1.0f, 0 };
@@ -265,7 +306,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex)
     clearValues[3].color = { {0.0f, 0.0f, 0.0f, 0.0f} };
     clearValues[4].color = { {0.0f, 0.0f, 0.0f, 0.0f} };
     clearValues[5].color = { {0.0f, 0.0f, 0.0f, 0.0f} };
-    clearValues[6].color = { {0.0f, 0.0f, 0.0f, 0.0f} }; // HDR
+    clearValues[6].color = { {0.0f, 0.0f, 0.0f, 0.0f} };
 
     VkRenderPassBeginInfo rpInfo{};
     rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -290,22 +331,42 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex)
 
     VkDescriptorSet camSet = m_Descriptors.GetCameraSet(m_CurrentFrame);
 
+    // Model matrices per scene
+    glm::mat4 sponzaModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.008f));
+    sponzaModel = glm::rotate(sponzaModel, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+
+
+    glm::mat4 helmetModel = glm::translate(glm::mat4(1.0f), glm::vec3(10.0f, 1.5f, 0.0f));
+    helmetModel = glm::rotate(helmetModel, glm::radians(90.0f), glm::vec3(1.0f, 1.0f, 0.0f)); // rotate 90 around Y
+    helmetModel = glm::scale(helmetModel, glm::vec3(0.5f));
+
+    std::vector<glm::mat4> modelMatrices = { sponzaModel, helmetModel };
+
     // --- Subpass 0: Depth Prepass ---
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_DepthPrepassPipeline.Get());
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
         m_DepthPrepassPipeline.GetLayout(), 0, 1, &camSet, 0, nullptr);
-    for (int i = 0; i < (int)m_Meshes.size(); i++)
+
+    for (int s = 0; s < (int)m_Scenes.size(); s++)
     {
-        int matIdx = m_Scene.meshes[i].materialIndex;
-        if (matIdx < 0) matIdx = 0;
-        VkDescriptorSet matSet = m_Descriptors.GetMaterialSet(matIdx);
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-            m_DepthPrepassPipeline.GetLayout(), 1, 1, &matSet, 0, nullptr);
-        VkBuffer vb[] = { m_Meshes[i].GetVertexBuffer() };
-        VkDeviceSize off[] = { 0 };
-        vkCmdBindVertexBuffers(cmd, 0, 1, vb, off);
-        vkCmdBindIndexBuffer(cmd, m_Meshes[i].GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
-        vkCmdDrawIndexed(cmd, m_Meshes[i].GetIndexCount(), 1, 0, 0, 0);
+        auto& rs = m_Scenes[s];
+        vkCmdPushConstants(cmd, m_DepthPrepassPipeline.GetLayout(),
+            VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMatrices[s]);
+
+        for (int i = 0; i < (int)rs.meshes.size(); i++)
+        {
+            int matIdx = rs.scene.meshes[i].materialIndex;
+            if (matIdx < 0) matIdx = 0;
+            matIdx += rs.materialOffset;
+            VkDescriptorSet matSet = m_Descriptors.GetMaterialSet(matIdx);
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                m_DepthPrepassPipeline.GetLayout(), 1, 1, &matSet, 0, nullptr);
+            VkBuffer vb[] = { rs.meshes[i].GetVertexBuffer() };
+            VkDeviceSize off[] = { 0 };
+            vkCmdBindVertexBuffers(cmd, 0, 1, vb, off);
+            vkCmdBindIndexBuffer(cmd, rs.meshes[i].GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+            vkCmdDrawIndexed(cmd, rs.meshes[i].GetIndexCount(), 1, 0, 0, 0);
+        }
     }
 
     // --- Subpass 1: Geometry Pass ---
@@ -313,18 +374,27 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex)
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_GeometryPipeline.Get());
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
         m_GeometryPipeline.GetLayout(), 0, 1, &camSet, 0, nullptr);
-    for (int i = 0; i < (int)m_Meshes.size(); i++)
+
+    for (int s = 0; s < (int)m_Scenes.size(); s++)
     {
-        int matIdx = m_Scene.meshes[i].materialIndex;
-        if (matIdx < 0) matIdx = 0;
-        VkDescriptorSet matSet = m_Descriptors.GetMaterialSet(matIdx);
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-            m_GeometryPipeline.GetLayout(), 1, 1, &matSet, 0, nullptr);
-        VkBuffer vb[] = { m_Meshes[i].GetVertexBuffer() };
-        VkDeviceSize off[] = { 0 };
-        vkCmdBindVertexBuffers(cmd, 0, 1, vb, off);
-        vkCmdBindIndexBuffer(cmd, m_Meshes[i].GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
-        vkCmdDrawIndexed(cmd, m_Meshes[i].GetIndexCount(), 1, 0, 0, 0);
+        auto& rs = m_Scenes[s];
+        vkCmdPushConstants(cmd, m_GeometryPipeline.GetLayout(),
+            VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMatrices[s]);
+
+        for (int i = 0; i < (int)rs.meshes.size(); i++)
+        {
+            int matIdx = rs.scene.meshes[i].materialIndex;
+            if (matIdx < 0) matIdx = 0;
+            matIdx += rs.materialOffset;
+            VkDescriptorSet matSet = m_Descriptors.GetMaterialSet(matIdx);
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                m_GeometryPipeline.GetLayout(), 1, 1, &matSet, 0, nullptr);
+            VkBuffer vb[] = { rs.meshes[i].GetVertexBuffer() };
+            VkDeviceSize off[] = { 0 };
+            vkCmdBindVertexBuffers(cmd, 0, 1, vb, off);
+            vkCmdBindIndexBuffer(cmd, rs.meshes[i].GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+            vkCmdDrawIndexed(cmd, rs.meshes[i].GetIndexCount(), 1, 0, 0, 0);
+        }
     }
 
     // --- Subpass 2: Lighting Pass ---
@@ -335,7 +405,6 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex)
         m_LightingPipeline.GetLayout(), 0, 1, &lightSet, 0, nullptr);
     vkCmdDraw(cmd, 3, 1, 0, 0);
 
-
     // --- Subpass 3: Tone Mapping ---
     vkCmdNextSubpass(cmd, VK_SUBPASS_CONTENTS_INLINE);
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_ToneMappingPipeline.Get());
@@ -344,40 +413,27 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex)
         m_ToneMappingPipeline.GetLayout(), 0, 1, &tmSet, 0, nullptr);
     vkCmdDraw(cmd, 3, 1, 0, 0);
 
-
     vkCmdEndRenderPass(cmd);
 
-
- 
     if (vkEndCommandBuffer(cmd) != VK_SUCCESS)
         throw std::runtime_error("Failed to record command buffer!");
 }
 
 void Renderer::UpdateUniformBuffer(uint32_t frame)
 {
-  
     UniformBufferObject ubo{};
-    ubo.model = glm::scale(glm::mat4(1.0f), glm::vec3(0.008f));
-    ubo.model = glm::rotate(ubo.model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
     ubo.view = m_Camera.GetView();
     ubo.proj = m_Camera.GetProjection();
-
+    ubo.model = glm::mat4(1.0f); // model now handled by push constants
     m_UniformBuffer.Update(frame, ubo);
 
     LightUBO light{};
-   
     light.dirLightDir = glm::vec4(glm::normalize(glm::vec3(-0.5f, -1.0f, -0.5f)), 0.0f);
+    light.dirLightColor = glm::vec4(1.0f, 0.95f, 0.8f,2.0f);
     light.camPos = glm::vec4(m_Camera.GetPosition(), 0.0f);
-
-
-  
-    light.dirLightColor = glm::vec4(1.0f, 0.95f, 0.8f, 0.5); // 5 lux
     light.aperture = 16.0f;
     light.shutterSpeed = 1.0f / 200.0f;
     light.iso = 100.0f;
-
-   
-
     m_UniformBuffer.UpdateLight(frame, light);
 }
 
@@ -414,14 +470,16 @@ void Renderer::DestroySyncObjects()
 
 void Renderer::CleanUp()
 {
-
-    DestroySwapChainDependents(); // destroys ToneMappingPool, HDRBuffer, etc.
+    DestroySwapChainDependents();
     m_SwapChain.DestroyImageViews();
     m_SwapChain.Destroy();
 
-    m_Scene.Destroy(m_Device.GetLogical());
+    for (auto& rs : m_Scenes)
+    {
+        rs.scene.Destroy(m_Device.GetLogical());
+        for (auto& mesh : rs.meshes) mesh.Destroy();
+    }
     m_FallbackTexture.Destroy();
-    for (auto& mesh : m_Meshes) mesh.Destroy();
     m_UniformBuffer.Destroy(CommandManager::MAX_FRAMES_IN_FLIGHT);
 
     m_Descriptors.DestroyCameraPool();
@@ -429,12 +487,12 @@ void Renderer::CleanUp()
     m_Descriptors.DestroyMaterialPool();
     m_Descriptors.DestroyMaterialLayout();
     m_Descriptors.DestroyLightingLayout();
-    m_Descriptors.DestroyToneMappingLayout(); // add this
+    m_Descriptors.DestroyToneMappingLayout();
 
     m_DepthPrepassPipeline.Destroy();
     m_GeometryPipeline.Destroy();
     m_LightingPipeline.Destroy();
-    m_ToneMappingPipeline.Destroy(); // add this
+    m_ToneMappingPipeline.Destroy();
     m_RenderPass.Destroy();
 
     DestroySyncObjects();

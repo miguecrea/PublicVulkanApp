@@ -25,13 +25,23 @@ public:
     // --- Set 1: per-material (albedo, normal, material UBO) ---
     void CreateMaterialLayout(Device* device);
     void CreateMaterialPool(Device* device, int materialCount);
+    
     void CreateMaterialSets(Device* device, int materialCount,
         const std::vector<VkBuffer>& materialUBOs,
         const std::vector<VkImageView>& albedoViews,
         const std::vector<VkSampler>& albedoSamplers,
         const std::vector<VkImageView>& normalViews,
         const std::vector<VkSampler>& normalSamplers,
+        const std::vector<VkImageView>& mrViews,
+        const std::vector<VkSampler>& mrSamplers,
+        const std::vector<VkImageView>& aoViews,
+        const std::vector<VkSampler>& aoSamplers,
+        const std::vector<VkImageView>& emissiveViews,
+        const std::vector<VkSampler>& emissiveSamplers,
         VkImageView fallbackView, VkSampler fallbackSampler);
+
+
+
     void DestroyMaterialLayout();
     void DestroyMaterialPool();
 
