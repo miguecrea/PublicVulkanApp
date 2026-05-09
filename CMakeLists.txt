@@ -83,6 +83,19 @@ foreach(SHADER ${VERT_SHADERS} ${FRAG_SHADERS})
     list(APPEND COMPILED_SHADERS ${OUTPUT})
 endforeach()
 
+file(GLOB COMP_SHADERS "${SHADER_SOURCE_DIR}/*.comp")
+foreach(SHADER ${COMP_SHADERS})
+    get_filename_component(SHADER_NAME ${SHADER} NAME)
+    set(OUTPUT "${SHADER_OUTPUT_DIR}/${SHADER_NAME}.spv")
+    add_custom_command(
+        OUTPUT ${OUTPUT}
+        COMMAND ${GLSLC} ${SHADER} -o ${OUTPUT}
+        DEPENDS ${SHADER}
+        COMMENT "Compiling compute shader: ${SHADER_NAME}"
+    )
+    list(APPEND COMPILED_SHADERS ${OUTPUT})
+endforeach()
+
 add_custom_target(Shaders ALL DEPENDS ${COMPILED_SHADERS})
 
 # -------------------------------------------------------

@@ -97,8 +97,11 @@ void SwapChain::DestroyImageViews()
 
 VkSurfaceFormatKHR SwapChain::ChooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats)
 {
+    // The Narkowicz ACES approximation already produces display-encoded (gamma-compressed)
+    // values. Using an _SRGB swapchain would apply γ=2.2 a second time and wash out
+    // all PBR contrast. Prefer UNORM so the ACES output is stored as-is.
     for (const auto& f : formats)
-        if (f.format == VK_FORMAT_B8G8R8A8_SRGB && f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+        if (f.format == VK_FORMAT_B8G8R8A8_UNORM && f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
             return f;
     return formats[0];
 }

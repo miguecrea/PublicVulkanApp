@@ -10,15 +10,14 @@ static std::string ShaderPath(const std::string& name)
     return std::string(PROJECT_SOURCE_DIR) + "/ShadersOutput/" + name + ".spv";
 }
 
-void Pipeline::BuildLayout(VkDescriptorSetLayout cameraLayout, VkDescriptorSetLayout materialLayout)
+void Pipeline::BuildLayout(VkDescriptorSetLayout cameraLayout, VkDescriptorSetLayout materialLayout, uint32_t pushSize)
 {
-   
     std::array<VkDescriptorSetLayout, 2> layouts = { cameraLayout, materialLayout };
 
     VkPushConstantRange pushRange{};
     pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     pushRange.offset = 0;
-    pushRange.size = sizeof(glm::mat4);
+    pushRange.size = pushSize;
 
     VkPipelineLayoutCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -139,7 +138,8 @@ void Pipeline::CreateGeometry(Device* device, VkRenderPass renderPass,
     VkDescriptorSetLayout cameraLayout, VkDescriptorSetLayout materialLayout)
 {
     m_Device = device;
-    BuildLayout(cameraLayout, materialLayout); // <-- changed
+    // 128 bytes: mat4 model + mat4 normalMatrix (precomputed on CPU)
+    BuildLayout(cameraLayout, materialLayout, 2 * sizeof(glm::mat4));
 
     auto vertCode = ReadFile(ShaderPath("geometry.vert"));
     auto fragCode = ReadFile(ShaderPath("geometry.frag"));
@@ -397,6 +397,106 @@ void Pipeline::CreateToneMapping(Device* device, VkRenderPass renderPass, VkDesc
 
     vkDestroyShaderModule(device->GetLogical(), fragModule, nullptr);
     vkDestroyShaderModule(device->GetLogical(), vertModule, nullptr);
+}
+
+void Pipeline::CreateShadow(Device* device, VkRenderPass shadowRenderPass)
+{
+    m_Device = device;
+
+    // Two mat4s pushed at vertex stage — total 128 bytes
+    VkPushConstantRange pushRange{};
+    pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushRange.offset     = 0;
+    pushRange.size       = 128; // lightSpaceMatrix (64) + model (64)
+
+    VkPipelineLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    layoutInfo.setLayoutCount         = 0;
+    layoutInfo.pushConstantRangeCount = 1;
+    layoutInfo.pPushConstantRanges    = &pushRange;
+    if (vkCreatePipelineLayout(m_Device->GetLogical(), &layoutInfo, nullptr, &m_Layout) != VK_SUCCESS)
+        throw std::runtime_error("Failed to create shadow pipeline layout!");
+
+    auto vertCode  = ReadFile(ShaderPath("shadow.vert"));
+    auto fragCode  = ReadFile(ShaderPath("shadow.frag"));
+    auto vertModule = CreateShaderModule(vertCode);
+    auto fragModule = CreateShaderModule(fragCode);
+    VkPipelineShaderStageCreateInfo stages[] = {
+        MakeStage(VK_SHADER_STAGE_VERTEX_BIT,   vertModule),
+        MakeStage(VK_SHADER_STAGE_FRAGMENT_BIT, fragModule)
+    };
+
+    auto bindingDesc = Vertex::GetBindingDescription();
+    auto attrDescs   = Vertex::GetAttributeDescriptions();
+
+    VkPipelineVertexInputStateCreateInfo vertexInput{};
+    vertexInput.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInput.vertexBindingDescriptionCount   = 1;
+    vertexInput.pVertexBindingDescriptions      = &bindingDesc;
+    vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrDescs.size());
+    vertexInput.pVertexAttributeDescriptions    = attrDescs.data();
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+    inputAssembly.sType    = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+    VkPipelineViewportStateCreateInfo viewportState{};
+    viewportState.sType         = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.scissorCount  = 1;
+
+    VkPipelineRasterizationStateCreateInfo rasterizer{};
+    rasterizer.sType                   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer.polygonMode             = VK_POLYGON_MODE_FILL;
+    rasterizer.lineWidth               = 1.0f;
+    rasterizer.cullMode                = VK_CULL_MODE_NONE; // cull front faces to reduce peter-panning
+    rasterizer.frontFace               = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.depthBiasEnable         = VK_TRUE;
+    rasterizer.depthBiasConstantFactor = 1.25f;
+    rasterizer.depthBiasSlopeFactor    = 1.75f;
+
+    VkPipelineMultisampleStateCreateInfo multisampling{};
+    multisampling.sType                = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkPipelineDepthStencilStateCreateInfo depthStencil{};
+    depthStencil.sType            = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable  = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp   = VK_COMPARE_OP_LESS_OR_EQUAL;
+
+    VkPipelineColorBlendStateCreateInfo colorBlending{};
+    colorBlending.sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlending.attachmentCount = 0; // no colour output
+
+    std::vector<VkDynamicState> dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+    VkPipelineDynamicStateCreateInfo dynamicState{};
+    dynamicState.sType             = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+    dynamicState.pDynamicStates    = dynamicStates.data();
+
+    VkGraphicsPipelineCreateInfo pipelineInfo{};
+    pipelineInfo.sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.stageCount          = 2;
+    pipelineInfo.pStages             = stages;
+    pipelineInfo.pVertexInputState   = &vertexInput;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pViewportState      = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterizer;
+    pipelineInfo.pMultisampleState   = &multisampling;
+    pipelineInfo.pDepthStencilState  = &depthStencil;
+    pipelineInfo.pColorBlendState    = &colorBlending;
+    pipelineInfo.pDynamicState       = &dynamicState;
+    pipelineInfo.layout              = m_Layout;
+    pipelineInfo.renderPass          = shadowRenderPass;
+    pipelineInfo.subpass             = 0;
+
+    if (vkCreateGraphicsPipelines(m_Device->GetLogical(), VK_NULL_HANDLE, 1,
+            &pipelineInfo, nullptr, &m_Pipeline) != VK_SUCCESS)
+        throw std::runtime_error("Failed to create shadow pipeline!");
+
+    vkDestroyShaderModule(device->GetLogical(), vertModule, nullptr);
+    vkDestroyShaderModule(device->GetLogical(), fragModule, nullptr);
 }
 
 std::vector<char> Pipeline::ReadFile(const std::string& path)

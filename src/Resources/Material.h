@@ -20,6 +20,7 @@ struct Material
 
     // Factors
     glm::vec4 baseColorFactor = glm::vec4(1.0f);
+    glm::vec3 emissiveFactor = glm::vec3(0.0f);
     float     metallicFactor = 0.0f;
     float     roughnessFactor = 0.5f;
 

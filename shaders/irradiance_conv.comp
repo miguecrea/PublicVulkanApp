@@ -1,0 +1,64 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(binding = 0) uniform samplerCube envMap;
+layout(binding = 1, rgba16f) uniform writeonly image2D faceOutput;
+
+layout(push_constant) uniform PC { int face; } push;
+
+const float PI = 3.14159265359;
+
+vec3 FaceDirection(int face, vec2 uv)
+{
+    switch (face)
+    {
+        case 0:  return normalize(vec3( 1.0,  uv.y, -uv.x));
+        case 1:  return normalize(vec3(-1.0,  uv.y,  uv.x));
+        case 2:  return normalize(vec3( uv.x,  1.0, -uv.y));
+        case 3:  return normalize(vec3( uv.x, -1.0,  uv.y));
+        case 4:  return normalize(vec3( uv.x,  uv.y,  1.0));
+        default: return normalize(vec3(-uv.x,  uv.y, -1.0));
+    }
+}
+
+void main()
+{
+    ivec2 texel = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size  = imageSize(faceOutput);
+    if (texel.x >= size.x || texel.y >= size.y) return;
+
+    vec2 uv = (vec2(texel) / vec2(size)) * 2.0 - 1.0;
+    vec3 N  = FaceDirection(push.face, uv);
+
+    // Build TBN frame around N for hemisphere integration
+    vec3 up    = abs(N.y) < 0.999 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    vec3 right = normalize(cross(up, N));
+    up         = cross(N, right);
+
+    vec3  irradiance = vec3(0.0);
+    float nSamples   = 0.0;
+
+    // Riemann sum over the hemisphere (coarse grid sufficient for irradiance)
+    const float sampleDelta = 0.025;
+    for (float phi = 0.0; phi < 2.0 * PI; phi += sampleDelta)
+    {
+        for (float theta = 0.0; theta < 0.5 * PI; theta += sampleDelta)
+        {
+            // Spherical to cartesian in tangent space
+            vec3 tangentSample = vec3(sin(theta) * cos(phi),
+                                      sin(theta) * sin(phi),
+                                      cos(theta));
+            // Transform to world space
+            vec3 sampleVec = tangentSample.x * right
+                           + tangentSample.y * up
+                           + tangentSample.z * N;
+
+            irradiance += texture(envMap, sampleVec).rgb * cos(theta) * sin(theta);
+            nSamples   += 1.0;
+        }
+    }
+
+    irradiance = PI * irradiance / nSamples;
+    imageStore(faceOutput, texel, vec4(irradiance, 1.0));
+}

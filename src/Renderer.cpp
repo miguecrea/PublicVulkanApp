@@ -3,10 +3,72 @@
 #include <array>
 #include <chrono>
 #include <iostream>
+#include <cmath>
 
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
+// ---------------------------------------------------------------------------
+// Point-light config table — single source of truth for both the LightUBO
+// (UpdateUniformBuffer) and the emissive gizmo spheres (Init).
+// position: world-space, Z-up. range in meters. intensity in lumens.
+// ---------------------------------------------------------------------------
+struct PointLightConfig
+{
+    glm::vec3 position;
+    glm::vec3 color;
+    float     intensity;
+    float     range;
+};
+
+static const std::array<PointLightConfig, 8> kPointLights = { {
+    {{-12.0f,  0.0f, 4.0f}, {1.00f, 0.45f, 0.15f}, 40000.0f, 14.0f}, // warm orange
+    {{ -4.0f,  0.0f, 4.0f}, {1.00f, 0.15f, 0.15f}, 40000.0f, 14.0f}, // red
+    {{  4.0f,  0.0f, 4.0f}, {1.00f, 0.95f, 0.30f}, 40000.0f, 14.0f}, // yellow
+    {{ 12.0f,  0.0f, 4.0f}, {0.20f, 0.45f, 1.00f}, 40000.0f, 14.0f}, // cool blue
+    {{ -8.0f, -6.0f, 4.0f}, {1.00f, 0.20f, 0.90f}, 30000.0f, 12.0f}, // magenta
+    {{  8.0f, -6.0f, 4.0f}, {0.20f, 1.00f, 0.95f}, 30000.0f, 12.0f}, // cyan
+    {{ -8.0f,  6.0f, 4.0f}, {0.30f, 1.00f, 0.35f}, 30000.0f, 12.0f}, // green
+    {{  8.0f,  6.0f, 4.0f}, {0.75f, 0.30f, 1.00f}, 30000.0f, 12.0f}, // purple
+} };
+
+// Small unit-sphere gizmo — sized at draw time via model matrix scale.
+static Mesh GenerateSphereMesh(int sectors = 24, int stacks = 16)
+{
+    Mesh m;
+    for (int i = 0; i <= stacks; i++)
+    {
+        float v    = (float)i / stacks;
+        float phi  = v * 3.14159265f;            // 0..pi
+        float y    = std::cos(phi);
+        float r    = std::sin(phi);
+        for (int j = 0; j <= sectors; j++)
+        {
+            float u    = (float)j / sectors;
+            float th   = u * 2.0f * 3.14159265f; // 0..2pi
+            glm::vec3 p = { r * std::cos(th), y, r * std::sin(th) };
+            Vertex vert{};
+            vert.pos      = p;
+            vert.normal   = glm::normalize(p);
+            vert.color    = glm::vec3(1.0f);
+            vert.texCoord = glm::vec2(u, v);
+            vert.tangent  = glm::vec4(1, 0, 0, 1);
+            m.vertices.push_back(vert);
+        }
+    }
+    for (int i = 0; i < stacks; i++)
+    {
+        for (int j = 0; j < sectors; j++)
+        {
+            uint32_t a = i * (sectors + 1) + j;
+            uint32_t b = a + sectors + 1;
+            m.indices.push_back(a);     m.indices.push_back(b);     m.indices.push_back(a + 1);
+            m.indices.push_back(a + 1); m.indices.push_back(b);     m.indices.push_back(b + 1);
+        }
+    }
+    return m;
+}
 
 Renderer::Renderer() : m_Window(800, 600) {}
 Renderer::~Renderer() {}
@@ -31,9 +93,9 @@ void Renderer::Init()
     m_CommandManager.AllocateCommandBuffers();
     m_RenderPass.Create(&m_Device, m_SwapChain.GetFormat());
 
-     //Load Sponza
+     // Load Sponza (only)
     RenderableScene sponza;
-    std::string sponzaPath = std::string(PROJECT_SOURCE_DIR) + "/Models/Sponza/sponza.gltf";
+    std::string sponzaPath = std::string(PROJECT_SOURCE_DIR) + "/Models/Sponza/NewSponza_Main_glTF_003.gltf";
     sponza.scene = GltfLoader::Load(sponzaPath, &m_Device, &m_CommandManager);
     sponza.meshes.resize(sponza.scene.meshes.size());
     for (int i = 0; i < (int)sponza.scene.meshes.size(); i++)
@@ -41,23 +103,41 @@ void Renderer::Init()
     sponza.materialOffset = 0;
     m_Scenes.push_back(std::move(sponza));
 
+    // -------------------------------------------------------
+    // Light gizmos — one emissive sphere per point light.
+    // Each gizmo is its own RenderableScene with one mesh + one material so
+    // it plugs into the existing per-scene draw / model-matrix loop.
+    // The emissive path in geometry.frag/lighting.frag bypasses BRDF, so these
+    // spheres glow at their light color regardless of scene illumination.
+    // -------------------------------------------------------
+    Mesh sphereMesh = GenerateSphereMesh();
+    int gizmoMatOffset = (int)m_Scenes.back().scene.materials.size(); // after Sponza
+    for (const auto& lc : kPointLights)
+    {
+        RenderableScene gizmo;
+        GltfMesh gm; gm.mesh = sphereMesh; gm.materialIndex = 0;
+        gizmo.scene.meshes.push_back(gm);
 
+        Material gizmoMat{};
+        // Emissive-only: BRDF path will still run but albedo=black => no diffuse/spec.
+        gizmoMat.baseColorFactor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+        gizmoMat.emissiveFactor  = lc.color * 40.0f; // bright enough to read through tone map
+        gizmoMat.roughnessFactor = 1.0f;
+        gizmoMat.metallicFactor  = 0.0f;
+        gizmo.scene.materials.push_back(gizmoMat);
 
+        gizmo.meshes.resize(1);
+        gizmo.meshes[0].UploadMesh(&m_Device, &m_CommandManager, sphereMesh);
+        gizmo.materialOffset = gizmoMatOffset++;
+        m_Scenes.push_back(std::move(gizmo));
+    }
 
+    // IBL — load HDR environment map and precompute irradiance cubemap
+    std::string hdrPath = std::string(PROJECT_SOURCE_DIR) + "/Textures/environment.hdr";
+    m_IBL.Create(&m_Device, &m_CommandManager, hdrPath);
 
-
-    // Load DamagedHelmet
-    RenderableScene helmet;
-    std::string helmetPath = std::string(PROJECT_SOURCE_DIR) + "/Models/DamagedHelmet/DamagedHelmet.gltf";
-    helmet.scene = GltfLoader::Load(helmetPath, &m_Device, &m_CommandManager);
-    helmet.meshes.resize(helmet.scene.meshes.size());
-    for (int i = 0; i < (int)helmet.scene.meshes.size(); i++)
-        helmet.meshes[i].UploadMesh(&m_Device, &m_CommandManager, helmet.scene.meshes[i].mesh);
-    helmet.materialOffset = (int)m_Scenes[0].scene.materials.size();
-    m_Scenes.push_back(std::move(helmet));
-
-
-
+    // Shadow map
+    m_ShadowMap.Create(&m_Device, &m_CommandManager);
 
 
 
@@ -90,6 +170,7 @@ void Renderer::Init()
 
             MaterialUBO mubo{};
             mubo.baseColorFactor = mat.baseColorFactor;
+            mubo.emissiveFactor = glm::vec4(mat.emissiveFactor, 0.0f);
             mubo.metallicFactor = mat.metallicFactor;
             mubo.roughnessFactor = mat.roughnessFactor;
             mubo.hasNormalMap = mat.hasNormalMap ? 1.0f : 0.0f;
@@ -148,6 +229,7 @@ void Renderer::Init()
         m_Descriptors.GetLightingLayout());
     m_ToneMappingPipeline.CreateToneMapping(&m_Device, m_RenderPass.Get(),
         m_Descriptors.GetToneMappingLayout());
+    m_ShadowPipeline.CreateShadow(&m_Device, m_ShadowMap.GetRenderPass());
 
     CreateSwapChainDependents();
     CreateSyncObjects();
@@ -186,7 +268,11 @@ void Renderer::CreateSwapChainDependents()
     };
     m_Descriptors.CreateLightingPool(&m_Device);
     m_Descriptors.CreateLightingSet(&m_Device, gbufferArr, lightBuffers,
-        CommandManager::MAX_FRAMES_IN_FLIGHT);
+        CommandManager::MAX_FRAMES_IN_FLIGHT,
+        m_ShadowMap.GetView(),        m_ShadowMap.GetSampler(),
+        m_IBL.GetIrradianceView(),    m_IBL.GetIrradianceSampler(),
+        m_IBL.GetPrefilterView(),     m_IBL.GetPrefilterSampler(),
+        m_IBL.GetBrdfLutView(),       m_IBL.GetBrdfLutSampler());
 
     m_Descriptors.CreateToneMappingPool(&m_Device);
     m_Descriptors.CreateToneMappingSet(&m_Device, m_HDRBuffer.GetView(),
@@ -319,6 +405,75 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex)
     rpInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
     rpInfo.pClearValues = clearValues.data();
 
+    // Model matrices (one per scene).
+    // [0] Sponza (glTF Y-up → Z-up). [1..N] light gizmo spheres at point-light positions.
+    glm::mat4 sponzaModel = glm::rotate(glm::mat4(1.0f),
+        glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    std::vector<glm::mat4> modelMatrices;
+    modelMatrices.reserve(1 + kPointLights.size());
+    modelMatrices.push_back(sponzaModel);
+    for (const auto& lc : kPointLights)
+    {
+        glm::mat4 m = glm::translate(glm::mat4(1.0f), lc.position);
+        m = glm::scale(m, glm::vec3(0.15f)); // 15cm radius marker
+        modelMatrices.push_back(m);
+    }
+
+    // -------------------------------------------------------
+    // Shadow pass — render depth from the light's POV
+    // -------------------------------------------------------
+    {
+        VkClearValue shadowClear{};
+        shadowClear.depthStencil = { 1.0f, 0 };
+
+        VkRenderPassBeginInfo shadowRP{};
+        shadowRP.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        shadowRP.renderPass        = m_ShadowMap.GetRenderPass();
+        shadowRP.framebuffer       = m_ShadowMap.GetFramebuffer();
+        shadowRP.renderArea.offset = { 0, 0 };
+        shadowRP.renderArea.extent = { ShadowMap::SIZE, ShadowMap::SIZE };
+        shadowRP.clearValueCount   = 1;
+        shadowRP.pClearValues      = &shadowClear;
+
+        vkCmdBeginRenderPass(cmd, &shadowRP, VK_SUBPASS_CONTENTS_INLINE);
+
+        VkViewport sv{};
+        sv.x = 0; sv.y = 0;
+        sv.width  = static_cast<float>(ShadowMap::SIZE);
+        sv.height = static_cast<float>(ShadowMap::SIZE);
+        sv.minDepth = 0.0f; sv.maxDepth = 1.0f;
+        vkCmdSetViewport(cmd, 0, 1, &sv);
+        VkRect2D ss = { {0, 0}, {ShadowMap::SIZE, ShadowMap::SIZE} };
+        vkCmdSetScissor(cmd, 0, 1, &ss);
+
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_ShadowPipeline.Get());
+
+        // Push lightSpaceMatrix at offset 0
+        vkCmdPushConstants(cmd, m_ShadowPipeline.GetLayout(),
+            VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &m_LightSpaceMatrix);
+
+        for (int s = 0; s < (int)m_Scenes.size(); s++)
+        {
+            auto& rs = m_Scenes[s];
+            // Push model matrix at offset 64
+            vkCmdPushConstants(cmd, m_ShadowPipeline.GetLayout(),
+                VK_SHADER_STAGE_VERTEX_BIT, 64, sizeof(glm::mat4), &modelMatrices[s]);
+            for (int i = 0; i < (int)rs.meshes.size(); i++)
+            {
+                VkBuffer     vb[]  = { rs.meshes[i].GetVertexBuffer() };
+                VkDeviceSize off[] = { 0 };
+                vkCmdBindVertexBuffers(cmd, 0, 1, vb, off);
+                vkCmdBindIndexBuffer(cmd, rs.meshes[i].GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+                vkCmdDrawIndexed(cmd, rs.meshes[i].GetIndexCount(), 1, 0, 0, 0);
+            }
+        }
+
+        vkCmdEndRenderPass(cmd);
+    }
+
+    // -------------------------------------------------------
+    // Main deferred render pass
+    // -------------------------------------------------------
     vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     VkViewport viewport{};
@@ -332,17 +487,6 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex)
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
     VkDescriptorSet camSet = m_Descriptors.GetCameraSet(m_CurrentFrame);
-
-    // Model matrices per scene
-    glm::mat4 sponzaModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.008f));
-    sponzaModel = glm::rotate(sponzaModel, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-
-
-    glm::mat4 helmetModel = glm::translate(glm::mat4(1.0f), glm::vec3(10.0f, 1.5f, 0.0f));
-    helmetModel = glm::rotate(helmetModel, glm::radians(90.0f), glm::vec3(1.0f, 1.0f, 0.0f)); // rotate 90 around Y
-    helmetModel = glm::scale(helmetModel, glm::vec3(0.5f));
-
-    std::vector<glm::mat4> modelMatrices = { sponzaModel, helmetModel };
 
     // --- Subpass 0: Depth Prepass ---
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_DepthPrepassPipeline.Get());
@@ -377,11 +521,17 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex)
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
         m_GeometryPipeline.GetLayout(), 0, 1, &camSet, 0, nullptr);
 
+    struct GeomPC { glm::mat4 model; glm::mat4 normalMatrix; };
+
     for (int s = 0; s < (int)m_Scenes.size(); s++)
     {
         auto& rs = m_Scenes[s];
+        GeomPC gpc;
+        gpc.model = modelMatrices[s];
+        glm::mat3 nm3 = glm::transpose(glm::inverse(glm::mat3(modelMatrices[s])));
+        gpc.normalMatrix = glm::mat4(nm3);
         vkCmdPushConstants(cmd, m_GeometryPipeline.GetLayout(),
-            VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMatrices[s]);
+            VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GeomPC), &gpc);
 
         for (int i = 0; i < (int)rs.meshes.size(); i++)
         {
@@ -430,12 +580,87 @@ void Renderer::UpdateUniformBuffer(uint32_t frame)
     m_UniformBuffer.Update(frame, ubo);
 
     LightUBO light{};
-    light.dirLightDir = glm::vec4(glm::normalize(glm::vec3(-0.5f, -1.0f, -0.5f)), 0.0f);
-    light.dirLightColor = glm::vec4(1.0f, 0.95f, 0.8f, 100000.0f);
-    light.camPos = glm::vec4(m_Camera.GetPosition(), 0.0f);
-    light.aperture = 16.0f;
-    light.shutterSpeed = 1.0f / 200.0f;
-    light.iso = 100.0f;
+
+    // -------------------------------------------------------
+    // Directional sun — angled down in Z-up world
+    // -------------------------------------------------------
+    glm::vec3 sunDir = glm::normalize(glm::vec3(0.4f, 0.3f, -1.0f));
+    light.dirLightDir   = glm::vec4(sunDir, 0.0f);
+    light.dirLightColor = glm::vec4(1.0f, 0.95f, 0.8f, 2000.0f);  // warm afternoon, 2 klux
+    light.camPos        = glm::vec4(m_Camera.GetPosition(), 0.0f);
+
+    // Sky ambient — soft blue hemisphere
+    light.skyLight = glm::vec4(0.53f, 0.73f, 1.0f, 500.0f);  // 500 lux hemisphere
+
+    // Physical camera — interior/mixed setting
+    light.aperture     = 2.8f;
+    light.shutterSpeed = 1.0f / 30.0f;
+    light.iso          = 400.0f;
+
+    // IBL
+    // HDR envmaps come in arbitrary radiance units; scale up so shadowed
+    // regions (which only get IBL ambient) aren't crushed against a 2000-lux sun.
+    light.useIBL       = m_IBL.IsValid() ? 1 : 0;
+    light.iblIntensity = 100.0f;
+
+    // -------------------------------------------------------
+    // Light-space matrix for shadow map
+    // Orthographic frustum encompassing the Sponza hall (Z-up world)
+    // -------------------------------------------------------
+    glm::vec3 lightPos  = -sunDir * 30.0f;
+    glm::mat4 lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    glm::mat4 lightProj = glm::ortho(-18.0f, 18.0f, -12.0f, 12.0f, 0.1f, 80.0f);
+
+    // Vulkan NDC: Y points down, depth [0,1].
+    // Apply scale-bias to map clip Z from [-1,1] → [0,1] so depth comparisons work.
+    // Y-flip is baked in via lightProj[1][1] *= -1.
+    lightProj[1][1] *= -1.0f;
+    glm::mat4 vulkanZ(1.0f);
+    vulkanZ[2][2] = 0.5f;
+    vulkanZ[3][2] = 0.5f;
+    m_LightSpaceMatrix         = vulkanZ * lightProj * lightView;
+    light.lightSpaceMatrix     = m_LightSpaceMatrix;
+
+    // -------------------------------------------------------
+    // Spot lights — warm lanterns along the hall (Z-up)
+    // -------------------------------------------------------
+    light.spotLightCount = 4;
+
+    auto& s0 = light.spotLights[0];
+    s0.position  = glm::vec4( 0.0f,  0.0f, 9.5f, 20.0f);
+    s0.direction = glm::vec4(glm::normalize(glm::vec3(0.0f, 0.0f, -1.0f)), glm::cos(glm::radians(25.0f)));
+    s0.color     = glm::vec4(1.0f, 0.85f, 0.6f, 80000.0f);
+    s0.outerCone = glm::cos(glm::radians(40.0f));
+
+    auto& s1 = light.spotLights[1];
+    s1.position  = glm::vec4(12.0f,  0.0f, 9.0f, 20.0f);
+    s1.direction = glm::vec4(glm::normalize(glm::vec3(0.0f, 0.0f, -1.0f)), glm::cos(glm::radians(25.0f)));
+    s1.color     = glm::vec4(1.0f, 0.85f, 0.6f, 80000.0f);
+    s1.outerCone = glm::cos(glm::radians(40.0f));
+
+    auto& s2 = light.spotLights[2];
+    s2.position  = glm::vec4(-12.0f, 0.0f, 9.0f, 20.0f);
+    s2.direction = glm::vec4(glm::normalize(glm::vec3(0.0f, 0.0f, -1.0f)), glm::cos(glm::radians(25.0f)));
+    s2.color     = glm::vec4(1.0f, 0.85f, 0.6f, 80000.0f);
+    s2.outerCone = glm::cos(glm::radians(40.0f));
+
+    auto& s3 = light.spotLights[3];
+    s3.position  = glm::vec4( 0.0f,  6.0f, 7.0f, 15.0f);
+    s3.direction = glm::vec4(glm::normalize(glm::vec3(0.0f, -0.3f, -1.0f)), glm::cos(glm::radians(30.0f)));
+    s3.color     = glm::vec4(1.0f, 0.9f, 0.7f, 60000.0f);
+    s3.outerCone = glm::cos(glm::radians(50.0f));
+
+    // -------------------------------------------------------
+    // Point lights — driven from kPointLights (shared with gizmo spheres)
+    // -------------------------------------------------------
+    light.pointLightCount = (int)kPointLights.size();
+    for (int i = 0; i < (int)kPointLights.size(); i++)
+    {
+        const auto& lc = kPointLights[i];
+        light.pointLights[i].position = glm::vec4(lc.position, lc.range);
+        light.pointLights[i].color    = glm::vec4(lc.color,    lc.intensity);
+    }
+
     m_UniformBuffer.UpdateLight(frame, light);
 }
 
@@ -495,7 +720,10 @@ void Renderer::CleanUp()
     m_GeometryPipeline.Destroy();
     m_LightingPipeline.Destroy();
     m_ToneMappingPipeline.Destroy();
+    m_ShadowPipeline.Destroy();
     m_RenderPass.Destroy();
+    m_ShadowMap.Destroy();
+    m_IBL.Destroy();
 
     DestroySyncObjects();
     m_CommandManager.Destroy();

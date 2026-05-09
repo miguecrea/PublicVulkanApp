@@ -4,6 +4,7 @@ layout(set = 1, binding = 0) uniform sampler2D albedoMap;
 layout(set = 1, binding = 1) uniform sampler2D normalMap;
 layout(set = 1, binding = 2) uniform MaterialUBO {
     vec4  baseColorFactor;
+    vec4  emissiveFactor;
     float metallicFactor;
     float roughnessFactor;
     float hasNormalMap;
@@ -52,14 +53,14 @@ void main()
     // Albedo (clean, no AO or emissive baked in)
     outAlbedo = vec4(albedoSample.rgb, albedoSample.a);
 
-    // Metallic/Roughness + AO in B channel
+    // Metallic/Roughness + AO in B channel (glTF: factors multiply the texture values)
     float metallic  = material.metallicFactor;
     float roughness = material.roughnessFactor;
     if (material.hasMetallicRoughness > 0.5)
     {
         vec4 mrSample = texture(metallicRoughnessMap, fragTexCoord);
-        roughness = mrSample.g;
-        metallic  = mrSample.b;
+        roughness *= mrSample.g;
+        metallic  *= mrSample.b;
     }
 
     float ao = 1.0;
@@ -69,8 +70,9 @@ void main()
     outMetallicRoughness = vec4(metallic, roughness, ao, 0.0);
 
     // Emissive (separate output, unlit contribution)
-    vec3 emissive = vec3(0.0);
+    // glTF: emissive = texture * factor, or just factor when no texture
+    vec3 emissive = material.emissiveFactor.rgb;
     if (material.hasEmissive > 0.5)
-        emissive = texture(emissiveMap, fragTexCoord).rgb;
+        emissive *= texture(emissiveMap, fragTexCoord).rgb;
     outEmissive = vec4(emissive, 0.0);
 }

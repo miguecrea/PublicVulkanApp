@@ -53,7 +53,11 @@ public:
     void CreateLightingPool(Device* device);
     void CreateLightingSet(Device* device,
         const std::array<VkImageView, 5>& gbufferViews,
-        const std::vector<VkBuffer>& lightBuffers, int framesInFlight);
+        const std::vector<VkBuffer>& lightBuffers, int framesInFlight,
+        VkImageView shadowView,    VkSampler shadowSampler,
+        VkImageView irrView,       VkSampler irrSampler,
+        VkImageView prefilterView, VkSampler prefilterSampler,
+        VkImageView brdfLutView,   VkSampler brdfLutSampler);
     void DestroyLightingLayout();
     void DestroyLightingPool();
 

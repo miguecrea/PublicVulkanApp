@@ -2,6 +2,10 @@
 #include <vulkan/vulkan.h>
 #include <vector>
 
+#define GLM_FORCE_RADIANS
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 #include "Core/Window.h"
 #include "Core/Instance.h"
 #include "Core/Device.h"
@@ -21,6 +25,8 @@
 #include "Resources/GltfLoader.h"
 #include "Resources/Material.h"
 #include "Rendering/HDRBuffer.h"
+#include "Rendering/ShadowMap.h"
+#include "Rendering/IBL.h"
 
 
 
@@ -94,6 +100,14 @@ private:
     //HDR
     HDRBuffer m_HDRBuffer;
     Pipeline  m_ToneMappingPipeline;
+
+    // Shadow mapping
+    ShadowMap m_ShadowMap;
+    Pipeline  m_ShadowPipeline;
+    glm::mat4 m_LightSpaceMatrix{1.0f};
+
+    // Image-Based Lighting
+    IBL m_IBL;
 
 
 

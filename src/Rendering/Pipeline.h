@@ -27,6 +27,10 @@ public:
     void CreateToneMapping(Device * device, VkRenderPass renderPass,
         VkDescriptorSetLayout toneMappingLayout);
 
+    // Shadow pass — depth only, no descriptor sets, 128-byte push constants
+    // (offset 0 = lightSpaceMatrix mat4, offset 64 = model mat4)
+    void CreateShadow(Device* device, VkRenderPass shadowRenderPass);
+
 private:
     Device* m_Device = nullptr;
     VkPipeline       m_Pipeline = VK_NULL_HANDLE;
@@ -36,6 +40,6 @@ private:
     VkShaderModule CreateShaderModule(const std::vector<char>& code);
     VkPipelineShaderStageCreateInfo MakeStage(VkShaderStageFlagBits stage, VkShaderModule module);
 
-    void BuildLayout(VkDescriptorSetLayout cameraLayout, VkDescriptorSetLayout materialLayout);
+    void BuildLayout(VkDescriptorSetLayout cameraLayout, VkDescriptorSetLayout materialLayout, uint32_t pushSize = sizeof(float) * 16);
     void BuildLayoutSingle(VkDescriptorSetLayout layout);
 };

@@ -290,24 +290,51 @@ void Descriptors::CreateLightingLayout(Device* device)
 {
     m_Device = device;
 
-    std::array<VkDescriptorSetLayoutBinding, 6> bindings{};
+    std::array<VkDescriptorSetLayoutBinding, 10> bindings{};
+
+    // bindings 0-4: G-Buffer input attachments
     for (int i = 0; i < 5; i++)
     {
-        bindings[i].binding = i;
-        bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+        bindings[i].binding         = i;
+        bindings[i].descriptorType  = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
         bindings[i].descriptorCount = 1;
-        bindings[i].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        bindings[i].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
     }
 
-    bindings[5].binding = 5;
-    bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    // binding 5: light UBO
+    bindings[5].binding         = 5;
+    bindings[5].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     bindings[5].descriptorCount = 1;
-    bindings[5].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[5].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    // binding 6: shadow map (combined image sampler with comparison)
+    bindings[6].binding         = 6;
+    bindings[6].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[6].descriptorCount = 1;
+    bindings[6].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    // binding 7: irradiance cubemap
+    bindings[7].binding         = 7;
+    bindings[7].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[7].descriptorCount = 1;
+    bindings[7].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    // binding 8: prefiltered specular environment map
+    bindings[8].binding         = 8;
+    bindings[8].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[8].descriptorCount = 1;
+    bindings[8].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    // binding 9: BRDF integration LUT
+    bindings[9].binding         = 9;
+    bindings[9].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[9].descriptorCount = 1;
+    bindings[9].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     VkDescriptorSetLayoutCreateInfo info{};
-    info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    info.bindingCount = 6;
-    info.pBindings = bindings.data();
+    info.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    info.bindingCount = 10;
+    info.pBindings    = bindings.data();
 
     if (vkCreateDescriptorSetLayout(device->GetLogical(), &info, nullptr, &m_LightingLayout) != VK_SUCCESS)
         throw std::runtime_error("Failed to create lighting descriptor layout!");
@@ -315,17 +342,19 @@ void Descriptors::CreateLightingLayout(Device* device)
 
 void Descriptors::CreateLightingPool(Device* device)
 {
-    std::array<VkDescriptorPoolSize, 2> sizes{};
-    sizes[0].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-    sizes[0].descriptorCount = 5 * 2; // 5 attachments * MAX_FRAMES
-    sizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    sizes[1].descriptorCount = 2; // MAX_FRAMES
+    std::array<VkDescriptorPoolSize, 3> sizes{};
+    sizes[0].type            = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+    sizes[0].descriptorCount = 5 * 2; // 5 G-Buffer attachments * 2 frames
+    sizes[1].type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    sizes[1].descriptorCount = 2;     // light UBO * 2 frames
+    sizes[2].type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    sizes[2].descriptorCount = 8;     // shadow(6)+irradiance(7)+prefilter(8)+brdfLut(9), 2 frames each
 
     VkDescriptorPoolCreateInfo info{};
-    info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    info.poolSizeCount = 2;
-    info.pPoolSizes = sizes.data();
-    info.maxSets = 2; // one per frame
+    info.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    info.poolSizeCount = static_cast<uint32_t>(sizes.size());
+    info.pPoolSizes    = sizes.data();
+    info.maxSets       = 2; // one per frame
 
     if (vkCreateDescriptorPool(device->GetLogical(), &info, nullptr, &m_LightingPool) != VK_SUCCESS)
         throw std::runtime_error("Failed to create lighting descriptor pool!");
@@ -333,14 +362,18 @@ void Descriptors::CreateLightingPool(Device* device)
 
 void Descriptors::CreateLightingSet(Device* device,
     const std::array<VkImageView, 5>& gbufferViews,
-    const std::vector<VkBuffer>& lightBuffers, int framesInFlight)
+    const std::vector<VkBuffer>& lightBuffers, int framesInFlight,
+    VkImageView shadowView,    VkSampler shadowSampler,
+    VkImageView irrView,       VkSampler irrSampler,
+    VkImageView prefilterView, VkSampler prefilterSampler,
+    VkImageView brdfLutView,   VkSampler brdfLutSampler)
 {
     std::vector<VkDescriptorSetLayout> layouts(framesInFlight, m_LightingLayout);
     VkDescriptorSetAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = m_LightingPool;
+    allocInfo.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool     = m_LightingPool;
     allocInfo.descriptorSetCount = framesInFlight;
-    allocInfo.pSetLayouts = layouts.data();
+    allocInfo.pSetLayouts        = layouts.data();
 
     m_LightingSets.resize(framesInFlight);
     if (vkAllocateDescriptorSets(device->GetLogical(), &allocInfo, m_LightingSets.data()) != VK_SUCCESS)
@@ -348,35 +381,89 @@ void Descriptors::CreateLightingSet(Device* device,
 
     for (int f = 0; f < framesInFlight; f++)
     {
-        std::array<VkDescriptorImageInfo, 5> imageInfos{};
-        std::array<VkWriteDescriptorSet, 6> writes{};
+        std::array<VkDescriptorImageInfo, 5> gbufInfos{};
+        std::array<VkWriteDescriptorSet, 10> writes{};
 
+        // bindings 0-4: G-Buffer input attachments
         for (int i = 0; i < 5; i++)
         {
-            imageInfos[i].imageView = gbufferViews[i];
-            imageInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            gbufInfos[i].imageView   = gbufferViews[i];
+            gbufInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-            writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writes[i].dstSet = m_LightingSets[f];
-            writes[i].dstBinding = i;
-            writes[i].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+            writes[i].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writes[i].dstSet          = m_LightingSets[f];
+            writes[i].dstBinding      = i;
+            writes[i].descriptorType  = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
             writes[i].descriptorCount = 1;
-            writes[i].pImageInfo = &imageInfos[i];
+            writes[i].pImageInfo      = &gbufInfos[i];
         }
 
+        // binding 5: light UBO
         VkDescriptorBufferInfo lightInfo{};
         lightInfo.buffer = lightBuffers[f];
         lightInfo.offset = 0;
-        lightInfo.range = sizeof(LightUBO);
+        lightInfo.range  = sizeof(LightUBO);
 
-        writes[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        writes[5].dstSet = m_LightingSets[f];
-        writes[5].dstBinding = 5;
-        writes[5].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        writes[5].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[5].dstSet          = m_LightingSets[f];
+        writes[5].dstBinding      = 5;
+        writes[5].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         writes[5].descriptorCount = 1;
-        writes[5].pBufferInfo = &lightInfo;
+        writes[5].pBufferInfo     = &lightInfo;
 
-        vkUpdateDescriptorSets(device->GetLogical(), 6, writes.data(), 0, nullptr);
+        // binding 6: shadow map (depth, comparison sampler)
+        VkDescriptorImageInfo shadowInfo{};
+        shadowInfo.imageView   = shadowView;
+        shadowInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+        shadowInfo.sampler     = shadowSampler;
+
+        writes[6].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[6].dstSet          = m_LightingSets[f];
+        writes[6].dstBinding      = 6;
+        writes[6].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writes[6].descriptorCount = 1;
+        writes[6].pImageInfo      = &shadowInfo;
+
+        // binding 7: irradiance cubemap
+        VkDescriptorImageInfo irrInfo{};
+        irrInfo.imageView   = irrView;
+        irrInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        irrInfo.sampler     = irrSampler;
+
+        writes[7].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[7].dstSet          = m_LightingSets[f];
+        writes[7].dstBinding      = 7;
+        writes[7].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writes[7].descriptorCount = 1;
+        writes[7].pImageInfo      = &irrInfo;
+
+        // binding 8: prefiltered specular env map
+        VkDescriptorImageInfo pfInfo{};
+        pfInfo.imageView   = prefilterView;
+        pfInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        pfInfo.sampler     = prefilterSampler;
+
+        writes[8].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[8].dstSet          = m_LightingSets[f];
+        writes[8].dstBinding      = 8;
+        writes[8].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writes[8].descriptorCount = 1;
+        writes[8].pImageInfo      = &pfInfo;
+
+        // binding 9: BRDF integration LUT
+        VkDescriptorImageInfo lutInfo{};
+        lutInfo.imageView   = brdfLutView;
+        lutInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        lutInfo.sampler     = brdfLutSampler;
+
+        writes[9].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[9].dstSet          = m_LightingSets[f];
+        writes[9].dstBinding      = 9;
+        writes[9].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writes[9].descriptorCount = 1;
+        writes[9].pImageInfo      = &lutInfo;
+
+        vkUpdateDescriptorSets(device->GetLogical(), 10, writes.data(), 0, nullptr);
     }
 }
 

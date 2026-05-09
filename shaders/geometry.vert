@@ -8,6 +8,7 @@ layout(set = 0, binding = 0) uniform UBO {
 
 layout(push_constant) uniform PushConstants {
     mat4 model;
+    mat4 normalMatrix;  // transpose(inverse(model)), precomputed on CPU
 } push;
 
 layout(location = 0) in vec3 inPos;
@@ -27,9 +28,9 @@ void main()
     fragWorldPos  = worldPos.xyz;
     fragTexCoord  = inTexCoord;
 
-    mat3 normalMatrix = transpose(inverse(mat3(push.model)));
-    vec3 N = normalize(normalMatrix * inNormal);
-    vec3 T = normalize(normalMatrix * inTangent.xyz);
+    mat3 nm = mat3(push.normalMatrix);
+    vec3 N = normalize(nm * inNormal);
+    vec3 T = normalize(nm * inTangent.xyz);
     T = normalize(T - dot(T, N) * N);
     vec3 B = cross(N, T) * inTangent.w;
     fragTBN = mat3(T, B, N);

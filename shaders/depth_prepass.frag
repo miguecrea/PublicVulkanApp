@@ -5,6 +5,7 @@ layout(set = 1, binding = 0) uniform sampler2D albedoMap;
 
 layout(set = 1, binding = 2) uniform MaterialUBO {
     vec4  baseColorFactor;
+    vec4  emissiveFactor;       // must match C++ MaterialUBO layout
     float metallicFactor;
     float roughnessFactor;
     float hasNormalMap;

@@ -2,15 +2,35 @@
 
 layout(input_attachment_index = 0, binding = 0) uniform subpassInput inHDR;
 
+struct SpotLight {
+    vec4  position;
+    vec4  direction;
+    vec4  color;
+    float outerCone;
+    float pad0; float pad1; float pad2;
+};
+
+struct PointLight {
+    vec4 position;
+    vec4 color;
+};
+
 layout(binding = 1) uniform LightUBO {
-    vec4 dirLightDir;
-    vec4 dirLightColor;
-    vec4 camPos;
-    // Physical camera settings
+    mat4  lightSpaceMatrix;
+    vec4  dirLightDir;
+    vec4  dirLightColor;
+    vec4  camPos;
+    vec4  skyLight;
     float aperture;
     float shutterSpeed;
     float iso;
-    float padding;
+    int   spotLightCount;
+    int   pointLightCount;
+    int   useIBL;
+    float iblIntensity;
+    float _padLight;
+    SpotLight  spotLights[8];
+    PointLight pointLights[8];
 } lights;
 
 layout(location = 0) out vec4 outColor;
@@ -69,9 +89,17 @@ vec3 Uncharted2ToneMapping(vec3 color)
 // -------------------------------------------------------
 void main()
 {
-  
+    vec4 hdrSample = subpassLoad(inHDR);
 
-    vec3 hdrColor = subpassLoad(inHDR).rgb;
+    // Sky/background pixels are flagged with alpha == 0 by the lighting pass.
+    // Output them directly — no exposure or tone mapping so the sky isn't black.
+    if (hdrSample.a == 0.0)
+    {
+        outColor = vec4(hdrSample.rgb, 1.0);
+        return;
+    }
+
+    vec3 hdrColor = hdrSample.rgb;
 
     // Physical camera exposure
     float ev100 = CalculateEV100(lights.aperture, lights.shutterSpeed, lights.iso);
@@ -80,5 +108,4 @@ void main()
 
     vec3 ldrColor = ACESFilmToneMapping(hdrColor);
     outColor = vec4(ldrColor, 1.0);
-
 }

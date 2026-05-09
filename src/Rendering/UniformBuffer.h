@@ -14,8 +14,9 @@ struct UniformBufferObject
 
 struct MaterialUBO
 {
-    
+
     alignas(16) glm::vec4 baseColorFactor;
+    alignas(16) glm::vec4 emissiveFactor;       // xyz = factor, w unused
     alignas(4)  float metallicFactor;
     alignas(4)  float roughnessFactor;
     alignas(4)  float hasNormalMap;
@@ -27,15 +28,41 @@ struct MaterialUBO
 };
 
 
+constexpr int MAX_SPOT_LIGHTS  = 8;
+constexpr int MAX_POINT_LIGHTS = 8;
+
+struct SpotLight
+{
+    alignas(16) glm::vec4 position;   // xyz = world pos,  w = range (meters)
+    alignas(16) glm::vec4 direction;  // xyz = direction,  w = cos(innerCone)
+    alignas(16) glm::vec4 color;      // xyz = RGB color,  w = intensity (lumens)
+    float outerCone;                  // cos(outerCone)
+    float _pad[3];
+};
+
+struct PointLight
+{
+    alignas(16) glm::vec4 position;   // xyz = world pos, w = range (meters)
+    alignas(16) glm::vec4 color;      // xyz = RGB color, w = intensity (lumens)
+};
+
 struct LightUBO
 {
+    alignas(16) glm::mat4 lightSpaceMatrix;                // directional light VP matrix
     alignas(16) glm::vec4 dirLightDir;
-    alignas(16) glm::vec4 dirLightColor;
+    alignas(16) glm::vec4 dirLightColor;   // xyz = color, w = illuminance (lux)
     alignas(16) glm::vec4 camPos;
-    alignas(4)  float aperture = 16.0f;  // f-stops
-    alignas(4)  float shutterSpeed = 1.0f / 125.0f; // seconds
-    alignas(4)  float iso = 100.0f;
-    alignas(4)  float padding;
+    alignas(16) glm::vec4 skyLight;        // xyz = sky color, w = sky irradiance (lux)
+    alignas(4)  float aperture;            // f-stops
+    alignas(4)  float shutterSpeed;        // seconds
+    alignas(4)  float iso;
+    alignas(4)  int   spotLightCount;
+    alignas(4)  int   pointLightCount;
+    alignas(4)  int   useIBL;              // 1 = sample irradiance cubemap, 0 = hemisphere
+    alignas(4)  float iblIntensity;        // IBL scale factor
+    alignas(4)  float _padLight;
+    SpotLight  spotLights[MAX_SPOT_LIGHTS];
+    PointLight pointLights[MAX_POINT_LIGHTS];
 };
 
 class UniformBuffer
