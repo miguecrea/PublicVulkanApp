@@ -2,20 +2,29 @@
 Miguel Angel Lozano Bedoya
 https://github.com/Howest-DAE-GD/gp2-vulkan-renderer-miguecrea
 
-# Setup (fetch assets)
+# Setup
 
 The heavy assets (Sponza model + textures + HDR environment, ~2.8 GB) are hosted
-separately at [miguecrea/Assets](https://github.com/miguecrea/Assets) and pulled
-in by a script — they are NOT part of this repo.
+separately at [miguecrea/Assets](https://github.com/miguecrea/Assets) as Release
+attachments — they are NOT part of this repo.
 
-After cloning, from PowerShell in the repo root:
+**Standard setup:** just configure CMake and the assets are auto-downloaded on
+the first run (one-time ~2.8 GB download):
 
-```powershell
-.\scripts\fetch_assets.ps1
+```bash
+cmake -S . -B out/build/x64-Debug -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build out/build/x64-Debug
 ```
 
-This downloads and extracts the 4 release zips into `Models/Sponza/` and `Textures/`.
-Re-run with `-Force` to overwrite an existing asset tree.
+To skip auto-fetch (e.g. on CI or if you have a local mirror):
+`cmake ... -DFETCH_ASSETS=OFF`
+
+**Manual fetch** (alternative, if you want assets without configuring CMake):
+
+```powershell
+.\scripts\fetch_assets.ps1          # downloads + extracts
+.\scripts\fetch_assets.ps1 -Force   # re-download even if present
+```
 
 You must have the Vulkan SDK installed and on PATH before building.
 

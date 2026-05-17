@@ -54,6 +54,51 @@ FetchContent_MakeAvailable(tinygltf)
 
 
 # -------------------------------------------------------
+# Heavy assets (Sponza model + textures + HDR, ~2.8 GB)
+# Hosted at https://github.com/miguecrea/Assets as Release attachments.
+# Auto-downloaded at configure time if missing.
+# -------------------------------------------------------
+option(FETCH_ASSETS "Auto-download heavy assets from miguecrea/Assets if missing" ON)
+
+set(ASSETS_MARKER "${CMAKE_SOURCE_DIR}/Models/Sponza/NewSponza_Main_glTF_003.bin")
+
+if(FETCH_ASSETS AND NOT EXISTS "${ASSETS_MARKER}")
+    set(ASSETS_BASE_URL "https://github.com/miguecrea/Assets/releases/latest/download")
+    set(ASSETS_ZIPS mesh.zip env.zip textures_part1.zip textures_part2.zip)
+    set(ASSETS_TMP "${CMAKE_BINARY_DIR}/_assets_dl")
+    file(MAKE_DIRECTORY "${ASSETS_TMP}")
+
+    message(STATUS "Heavy assets missing - fetching from ${ASSETS_BASE_URL}")
+    message(STATUS "One-time ~2.8 GB download (skip with -DFETCH_ASSETS=OFF)")
+
+    foreach(zip IN LISTS ASSETS_ZIPS)
+        set(zip_path "${ASSETS_TMP}/${zip}")
+        message(STATUS "  Downloading ${zip}...")
+        file(DOWNLOAD
+            "${ASSETS_BASE_URL}/${zip}"
+            "${zip_path}"
+            SHOW_PROGRESS
+            STATUS dl_status
+        )
+        list(GET dl_status 0 dl_code)
+        if(NOT dl_code EQUAL 0)
+            list(GET dl_status 1 dl_msg)
+            file(REMOVE "${zip_path}")
+            message(FATAL_ERROR "Failed to download ${zip}: ${dl_msg}")
+        endif()
+        message(STATUS "  Extracting ${zip}...")
+        file(ARCHIVE_EXTRACT
+            INPUT "${zip_path}"
+            DESTINATION "${CMAKE_SOURCE_DIR}"
+        )
+        file(REMOVE "${zip_path}")
+    endforeach()
+
+    file(REMOVE_RECURSE "${ASSETS_TMP}")
+    message(STATUS "Assets ready")
+endif()
+
+# -------------------------------------------------------
 # Vulkan SDK (user must have it installed)
 # -------------------------------------------------------
 find_package(Vulkan REQUIRED)
