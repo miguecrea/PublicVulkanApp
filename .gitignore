@@ -61,6 +61,12 @@ vcpkg-bootstrap.log
 /out/**/shaders/
 
 # =========================
+# Heavy assets (fetched from separate repo - see scripts/fetch_assets.ps1)
+# =========================
+/Models/
+/Textures/
+
+# =========================
 # OS junk
 # =========================
 Thumbs.db
