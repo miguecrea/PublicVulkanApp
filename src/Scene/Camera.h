@@ -30,14 +30,16 @@ private:
     float m_Near = 0.1f;
     float m_Far = 100.0f;
 
-    glm::vec3 m_Position = { 50.0f, 5.0f, 30.0f }; // x, y, z
+    glm::vec3 m_Position = { 10.240f, 0.654f, 2.956f };
+    float m_Yaw = 181.700f;
+    float m_Pitch = 1.100f;
+
     glm::vec3 m_Front = { -1.0f, -1.0f, -1.0f };
     glm::vec3 m_Up = { 0.0f,  0.0f,  1.0f };
     glm::vec3 m_Right = { 1.0f,  0.0f,  0.0f };
     glm::vec3 m_WorldUp = { 0.0f,  0.0f,  1.0f };
 
-    float m_Yaw = 180.0f; // was 0.0f
-    float m_Pitch = 0.f;
+
 
     float m_MoveSpeed = 20.0f;
     float m_LookSpeed = 0.1f;

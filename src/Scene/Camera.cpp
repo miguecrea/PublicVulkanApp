@@ -1,5 +1,6 @@
 #include "Camera.h"
 #include <algorithm>
+#include <cstdio>
 
 Camera * Camera::s_Instance = nullptr;
 
@@ -60,6 +61,22 @@ void Camera::ProcessKeyboard(float deltaTime)
         if (!cursorVisible) m_FirstMouse = true;
     }
     escWasPressed = escNow;
+
+    // P prints current pose as a paste-ready snippet for Camera.h defaults
+    static bool pWasPressed = false;
+    bool pNow = glfwGetKey(m_Window, GLFW_KEY_P) == GLFW_PRESS;
+    if (pNow && !pWasPressed)
+    {
+        std::printf(
+            "// --- Camera pose ---\n"
+            "glm::vec3 m_Position = { %.3ff, %.3ff, %.3ff };\n"
+            "float m_Yaw   = %.3ff;\n"
+            "float m_Pitch = %.3ff;\n",
+            m_Position.x, m_Position.y, m_Position.z,
+            m_Yaw, m_Pitch);
+        std::fflush(stdout);
+    }
+    pWasPressed = pNow;
 }
 
 void Camera::ProcessMouse()
