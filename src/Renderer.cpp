@@ -95,7 +95,7 @@ void Renderer::Init()
 
      // Load Sponza (only)
     RenderableScene sponza;
-    std::string sponzaPath = std::string(PROJECT_SOURCE_DIR) + "/Models/Sponza/NewSponza_Main_glTF_003.gltf";
+    std::string sponzaPath = std::string(PROJECT_SOURCE_DIR) + "/Models/Sponza/Sponza.gltf";
     sponza.scene = GltfLoader::Load(sponzaPath, &m_Device, &m_CommandManager);
     sponza.meshes.resize(sponza.scene.meshes.size());
     for (int i = 0; i < (int)sponza.scene.meshes.size(); i++)

@@ -54,51 +54,30 @@ FetchContent_MakeAvailable(tinygltf)
 
 
 # -------------------------------------------------------
-# Heavy assets (Sponza model + textures + HDR, ~2.8 GB)
-# Hosted at https://github.com/miguecrea/Assets as Release attachments.
-# Each zip has its own marker file - if the marker is missing the zip
-# is (re)downloaded + extracted with retries, so partial failures self-heal
-# on the next configure.
+# Heavy assets (Sponza model + textures + HDR, ~60 MB)
+# Hosted at https://github.com/miguecrea/Assets as a Release attachment.
+# Downloaded with 3 retries; if the post-extract marker is missing the
+# next configure will re-fetch automatically.
 # -------------------------------------------------------
 option(FETCH_ASSETS "Auto-download heavy assets from miguecrea/Assets if missing" ON)
 
 if(FETCH_ASSETS)
-    set(ASSETS_BASE_URL "https://github.com/miguecrea/Assets/releases/latest/download")
-    set(ASSETS_TMP "${CMAKE_BINARY_DIR}/_assets_dl")
+    set(ASSETS_URL    "https://github.com/miguecrea/Assets/releases/latest/download/assets.zip")
+    set(ASSETS_MARKER "${CMAKE_SOURCE_DIR}/Models/Sponza/Sponza.bin")
+    set(ASSETS_TMP    "${CMAKE_BINARY_DIR}/_assets_dl")
 
-    # zip_name|marker_file_relative_to_source_dir
-    set(ASSET_PACKS
-        "mesh.zip|Models/Sponza/NewSponza_Main_glTF_003.bin"
-        "env.zip|Textures/environment.hdr"
-        "textures_part1.zip|Models/Sponza/textures/arch_stone_wall_01_BaseColor.png"
-        "textures_part2.zip|Models/Sponza/textures/wood_tile_01_Roughnesswood_tile_01_Metalness.png"
-    )
-
-    set(_any_fetched FALSE)
-    foreach(pack IN LISTS ASSET_PACKS)
-        string(REPLACE "|" ";" pack_pair "${pack}")
-        list(GET pack_pair 0 zip)
-        list(GET pack_pair 1 marker)
-        set(marker_full "${CMAKE_SOURCE_DIR}/${marker}")
-
-        if(EXISTS "${marker_full}")
-            continue()
-        endif()
-
-        if(NOT _any_fetched)
-            message(STATUS "Heavy assets missing - fetching from ${ASSETS_BASE_URL}")
-            message(STATUS "(skip with -DFETCH_ASSETS=OFF)")
-            set(_any_fetched TRUE)
-        endif()
+    if(NOT EXISTS "${ASSETS_MARKER}")
+        message(STATUS "Heavy assets missing - fetching from ${ASSETS_URL}")
+        message(STATUS "(skip with -DFETCH_ASSETS=OFF)")
 
         file(MAKE_DIRECTORY "${ASSETS_TMP}")
-        set(zip_path "${ASSETS_TMP}/${zip}")
+        set(zip_path "${ASSETS_TMP}/assets.zip")
 
         set(_download_ok FALSE)
         foreach(attempt RANGE 1 3)
-            message(STATUS "Downloading ${zip} (attempt ${attempt}/3)")
+            message(STATUS "Downloading assets.zip (attempt ${attempt}/3)")
             file(DOWNLOAD
-                "${ASSETS_BASE_URL}/${zip}"
+                "${ASSETS_URL}"
                 "${zip_path}"
                 SHOW_PROGRESS
                 STATUS dl_status
@@ -115,31 +94,25 @@ if(FETCH_ASSETS)
 
         if(NOT _download_ok)
             message(FATAL_ERROR
-                "Failed to download ${zip} after 3 attempts. "
+                "Failed to download assets.zip after 3 attempts. "
                 "Re-run cmake, or run scripts/fetch_assets.ps1 -Force manually, "
                 "or set -DFETCH_ASSETS=OFF and provide assets yourself."
             )
         endif()
 
-        message(STATUS "Extracting ${zip}")
+        message(STATUS "Extracting assets.zip")
         file(ARCHIVE_EXTRACT
             INPUT "${zip_path}"
             DESTINATION "${CMAKE_SOURCE_DIR}"
         )
-        file(REMOVE "${zip_path}")
+        file(REMOVE_RECURSE "${ASSETS_TMP}")
 
-        if(NOT EXISTS "${marker_full}")
+        if(NOT EXISTS "${ASSETS_MARKER}")
             message(FATAL_ERROR
-                "Extraction of ${zip} did not produce ${marker} - zip may be corrupt. "
+                "Extraction of assets.zip did not produce Models/Sponza/Sponza.bin - zip may be corrupt. "
                 "Try re-running cmake, or scripts/fetch_assets.ps1 -Force."
             )
         endif()
-    endforeach()
-
-    if(EXISTS "${ASSETS_TMP}")
-        file(REMOVE_RECURSE "${ASSETS_TMP}")
-    endif()
-    if(_any_fetched)
         message(STATUS "Assets ready")
     endif()
 endif()
