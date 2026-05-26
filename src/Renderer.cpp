@@ -586,20 +586,21 @@ void Renderer::UpdateUniformBuffer(uint32_t frame)
     // -------------------------------------------------------
     glm::vec3 sunDir = glm::normalize(glm::vec3(0.4f, 0.3f, -1.0f));
     light.dirLightDir   = glm::vec4(sunDir, 0.0f);
-    light.dirLightColor = glm::vec4(1.0f, 0.95f, 0.8f, 30000.0f);  // warm afternoon, 30 klux
+    light.dirLightColor = glm::vec4(1.0f, 0.95f, 0.8f, 30000.0f);  // 30 klux warm afternoon sun
     light.camPos        = glm::vec4(m_Camera.GetPosition(), 0.0f);
 
     // Sky ambient — soft blue hemisphere (only used when IBL is disabled)
-    light.skyLight = glm::vec4(0.53f, 0.73f, 1.0f, 5000.0f);  // 5 klux hemisphere
+    light.skyLight = glm::vec4(0.53f, 0.73f, 1.0f, 5000.0f);
 
-    // Physical camera — daylight setting (ISO 100, f/8, 1/125s ~ outdoor sunny)
-    light.aperture     = 8.0f;
-    light.shutterSpeed = 1.0f / 125.0f;
+    // Camera — interior with daylight outside (f/4 lets enough light in for shaded areas)
+    light.aperture     = 4.0f;
+    light.shutterSpeed = 1.0f / 60.0f;
     light.iso          = 100.0f;
 
-    // IBL — sample the HDR cubemap at its actual radiance; no artificial boost.
+    // IBL — boost to ~physical sky-irradiance scale since the HDR cubemap
+    // stores radiance in arbitrary units (typical magnitude 1-5).
     light.useIBL       = m_IBL.IsValid() ? 1 : 0;
-    light.iblIntensity = 1.0f;
+    light.iblIntensity = 500.0f;
 
     // -------------------------------------------------------
     // Light-space matrix for shadow map
