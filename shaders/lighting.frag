@@ -79,6 +79,14 @@ vec3 F_Schlick(float cosTheta, vec3 F0)
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
+// Roughness-aware Fresnel for ambient/IBL (Lazarov approximation).
+// Direct lighting uses F_Schlick; IBL needs this to avoid over-bright reflections
+// at grazing angles on rough surfaces.
+vec3 F_SchlickRoughness(float cosTheta, vec3 F0, float roughness)
+{
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
 // Shared BRDF eval — returns (diffuse + specular) * irradiance * NdotL
 vec3 EvalBRDF(vec3 N, vec3 V, vec3 L, vec3 albedo, float metallic,
               float roughness, vec3 F0, vec3 irradiance)
@@ -101,7 +109,7 @@ vec3 EvalBRDF(vec3 N, vec3 V, vec3 L, vec3 albedo, float metallic,
 // -------------------------------------------------------
 // PCF shadow — 3x3 kernel, sampler2DShadow does comparison
 // -------------------------------------------------------
-float ShadowPCF(vec4 shadowCoord)
+float ShadowPCF(vec4 shadowCoord, vec3 N, vec3 L)
 {
     // Perspective divide + remap XY to [0,1] UV
     // Z is already in [0,1] because lightSpaceMatrix includes the Vulkan Z scale-bias
@@ -111,6 +119,12 @@ float ShadowPCF(vec4 shadowCoord)
     // Outside the light frustum — treat as fully lit
     if (proj.z > 1.0 || proj.z < 0.0) return 1.0;
 
+    // Slope-scaled depth bias: surfaces nearly parallel to the light direction
+    // need more bias to avoid shadow acne (pitch-black self-shadowing under
+    // overhangs, balconies, etc).
+    float NdotL = max(dot(N, L), 0.0);
+    float bias  = max(0.005 * (1.0 - NdotL), 0.0005);
+
     const vec2 texelSize = vec2(1.0 / 2048.0);
     float shadow = 0.0;
     for (int x = -1; x <= 1; x++)
@@ -118,7 +132,7 @@ float ShadowPCF(vec4 shadowCoord)
         for (int y = -1; y <= 1; y++)
         {
             // texture() on sampler2DShadow returns 0 (shadowed) or 1 (lit)
-            shadow += texture(shadowMap, vec3(proj.xy + vec2(x, y) * texelSize, proj.z));
+            shadow += texture(shadowMap, vec3(proj.xy + vec2(x, y) * texelSize, proj.z - bias));
         }
     }
     return shadow / 9.0;
@@ -159,7 +173,7 @@ void main()
     vec3  Lo           = EvalBRDF(N, V, L, albedo, metallic, roughness, F0, dirIrradiance);
 
     vec4  shadowCoord  = lights.lightSpaceMatrix * vec4(worldPos, 1.0);
-    float shadowFactor = ShadowPCF(shadowCoord);
+    float shadowFactor = ShadowPCF(shadowCoord, N, L);
     Lo *= shadowFactor; // shadow only affects direct light
 
     // -------------------------------------------------------
@@ -222,10 +236,12 @@ void main()
     if (lights.useIBL != 0)
     {
         // --- Diffuse IBL ---
-        vec3 sampleDir  = vec3(N.x, N.z, -N.y);
+        vec3 sampleDir  = vec3(N.x, N.z, -N.y);    // Z-up world -> Y-up cubemap
         vec3 irradiance = texture(irradianceMap, sampleDir).rgb;
 
-        vec3 F_IBL  = F_Schlick(max(dot(N, V), 0.0), F0);
+        // Roughness-aware Fresnel — required for IBL so rough surfaces don't
+        // get over-bright "specular" leaking into the ambient term.
+        vec3 F_IBL  = F_SchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
         vec3 kD_IBL = (vec3(1.0) - F_IBL) * (1.0 - metallic);
         vec3 diffuseIBL = kD_IBL * albedo * irradiance;
 

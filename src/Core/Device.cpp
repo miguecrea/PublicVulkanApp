@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <set>
 #include <iostream>
+#include <algorithm>
 
 void Device::Init(Instance* instance, VkSurfaceKHR surface)
 {
@@ -27,16 +28,58 @@ void Device::PickPhysicalDevice(VkInstance instance)
     std::vector<VkPhysicalDevice> devices(count);
     vkEnumeratePhysicalDevices(instance, &count, devices.data());
 
+    // Score every suitable device and pick the highest. Prevents picking the
+    // integrated GPU on hybrid laptops (which would otherwise often "win" by
+    // appearing first in the enumeration).
+    int                bestScore = -1;
+    VkPhysicalDevice   bestDev   = VK_NULL_HANDLE;
+    const char*        bestName  = "<none>";
+    const char*        bestType  = "<unknown>";
+
     for (const auto& device : devices)
     {
-        if (IsDeviceSuitable(device))
+        if (!IsDeviceSuitable(device)) continue;
+
+        VkPhysicalDeviceProperties props;
+        vkGetPhysicalDeviceProperties(device, &props);
+
+        int score = 0;
+        const char* typeName = "Other";
+        switch (props.deviceType)
         {
-            m_PhysicalDevice = device;
-            break;
+            case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:   score = 1000; typeName = "Discrete";   break;
+            case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: score =  100; typeName = "Integrated"; break;
+            case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:    score =   10; typeName = "Virtual";    break;
+            case VK_PHYSICAL_DEVICE_TYPE_CPU:            score =    1; typeName = "CPU";        break;
+            default:                                     score =    0; typeName = "Other";     break;
+        }
+        // Tie-breaker: prefer the device with the larger DEVICE_LOCAL heap (i.e. more VRAM).
+        VkPhysicalDeviceMemoryProperties memProps;
+        vkGetPhysicalDeviceMemoryProperties(device, &memProps);
+        VkDeviceSize vramBytes = 0;
+        for (uint32_t i = 0; i < memProps.memoryHeapCount; ++i)
+            if (memProps.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+                vramBytes = std::max<VkDeviceSize>(vramBytes, memProps.memoryHeaps[i].size);
+        score += static_cast<int>(vramBytes / (1024ull * 1024ull * 256ull)); // +1 per 256 MB
+
+        std::cout << "[Device] Candidate: " << props.deviceName
+                  << " (" << typeName << ", "
+                  << (vramBytes / (1024ull * 1024ull)) << " MB) score=" << score << "\n";
+
+        if (score > bestScore)
+        {
+            bestScore = score;
+            bestDev   = device;
+            bestName  = props.deviceName;
+            bestType  = typeName;
         }
     }
-    if (m_PhysicalDevice == VK_NULL_HANDLE)
+
+    if (bestDev == VK_NULL_HANDLE)
         throw std::runtime_error("Failed to find a suitable GPU!");
+
+    m_PhysicalDevice = bestDev;
+    std::cout << "[Device] Selected: " << bestName << " (" << bestType << ")" << std::endl;
 }
 
 void Device::CreateLogicalDevice(Instance* instance)
