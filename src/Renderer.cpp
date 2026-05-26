@@ -607,9 +607,12 @@ void Renderer::UpdateUniformBuffer(uint32_t frame)
     // Light-space matrix for shadow map
     // Orthographic frustum encompassing the Sponza hall (Z-up world)
     // -------------------------------------------------------
-    glm::vec3 lightPos  = -sunDir * 30.0f;
+    // Frustum sized for Khronos Sponza (~30m wide x 13m long x 16m tall).
+    // Wider XY range so balconies/sides are inside the shadow map; longer
+    // depth range so the bottom floor isn't past the far plane.
+    glm::vec3 lightPos  = -sunDir * 40.0f;
     glm::mat4 lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    glm::mat4 lightProj = glm::ortho(-18.0f, 18.0f, -12.0f, 12.0f, 0.1f, 80.0f);
+    glm::mat4 lightProj = glm::ortho(-25.0f, 25.0f, -25.0f, 25.0f, 0.1f, 120.0f);
 
     // Vulkan NDC: Y points down, depth [0,1].
     // Apply scale-bias to map clip Z from [-1,1] → [0,1] so depth comparisons work.
