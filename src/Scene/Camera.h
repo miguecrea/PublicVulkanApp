@@ -41,8 +41,8 @@ private:
 
 
 
-    float m_MoveSpeed = 20.0f;
-    float m_LookSpeed = 0.1f;
+    float m_MoveSpeed   = 5.0f;   // m/s (3x with Shift = 15 m/s, ~sprint)
+    float m_LookSpeed   = 0.05f;  // degrees per mouse pixel
     float m_ScrollSpeed = 1.0f;
 
     bool  m_FirstMouse = true;
